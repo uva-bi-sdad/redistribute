@@ -1,0 +1,13 @@
+.*\.Rproj$
+^\.Rproj\.user$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^LICENSE\.md$
+^build\.R$
+^logo\.svg$
+^cran-comments\.md$
+^CRAN-RELEASE$
+^vignettes
+^coverage$
+_snaps$

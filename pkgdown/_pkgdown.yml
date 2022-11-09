@@ -1,0 +1,12 @@
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+authors:
+  Biocomplexity Institute:
+    href: https://biocomplexity.virginia.edu/institute/divisions/social-and-decision-analytics
+
+home:
+  links:
+  - text: Test Coverage
+    href: coverage.html

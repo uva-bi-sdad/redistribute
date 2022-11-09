@@ -1,0 +1,24 @@
+Package: redistribute
+Type: Package
+Title: Redistribute Data
+Version: 0.0.1
+Authors@R: c(
+    person("Biocomplexity Institute", role = c("cph", "fnd")),
+    person("Micah", "Iserman", role = c("aut", "cre"), email = "micah.iserman@gmail.com")
+  )
+Description: Offers a variety of methods to redistribute (aggregate, disaggregate, or rearrange) data
+  observed in a given frame (such as a geography) to alternative frames
+  (such as alternate, or sub- or super-geographies).
+URL: https://github.com/uva-bi-sdad/redistribute
+BugReports: https://github.com/uva-bi-sdad/redistribute/issues
+Imports: cli, Rcpp, RcppParallel
+License: MIT + file LICENSE
+RoxygenNote: 7.2.1
+Roxygen: list(old_usage = TRUE)
+Suggests: 
+  knitr,
+  rmarkdown,
+  testthat (>= 3.0.0)
+Config/testthat/edition: 3
+LinkingTo: Rcpp, RcppParallel
+SystemRequirements: C++11
