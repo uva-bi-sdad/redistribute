@@ -49,9 +49,9 @@
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">redistribute</span><span class="op">(</span><span class="va">source</span>, <span class="va">target</span>, map <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>, source_id <span class="op">=</span> <span class="st">"GEOID"</span>,</span>
-<span>  target_id <span class="op">=</span> <span class="va">source_id</span>, target_weight <span class="op">=</span> <span class="st">"population"</span>,</span>
-<span>  source_variable <span class="op">=</span> <span class="cn">NULL</span>, source_value <span class="op">=</span> <span class="cn">NULL</span>, outFile <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  overwrite <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span>  target_id <span class="op">=</span> <span class="va">source_id</span>, target_weight <span class="op">=</span> <span class="cn">NULL</span>, source_variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, outFile <span class="op">=</span> <span class="cn">NULL</span>, overwrite <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -73,7 +73,9 @@ the dataset you want but isn't available, and is often at a higher resolution / 
 
 <dt>source_id, target_id</dt>
 <dd><p>Name of a column in <code>source</code> / <code>target</code>,
-or a vector containing IDs.</p></dd>
+or a vector containing IDs. For <code>source</code>, this will default to the first column. For
+<code>target</code>, columns will be searched through for one that appears to relate to the
+source IDs, falling back to the first column.</p></dd>
 
 
 <dt>target_weight</dt>
@@ -117,8 +119,7 @@ and values for conversion.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: all target IDs for single source</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target weights: <span style="color: #00BB00;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) a</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) b</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) a, b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id   a   b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 0.2 0.4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2  2 0.2 0.4</span>
@@ -138,20 +139,20 @@ and values for conversion.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: first <span style="color: #00BB00;">1</span> character of target IDs</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target weights: <span style="color: #00BB00;">population</span> column of `target`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) num</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    id cat        num</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b5 bbb 0.12645416</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a2 aaa 0.26481263</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  a4 aaa 0.22499052</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b4 bbb 0.79521765</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a3 aaa 0.21594029</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  b2 bbb 0.21779471</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  a5 aaa 0.09095222</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  b3 bbb 0.60792355</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  a1 aaa 0.20330433</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 b1 bbb 0.25260993</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b3 bbb 0.49237923</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a3 aaa 0.21784500</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  b2 bbb 0.38141331</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b4 bbb 0.46462788</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a2 aaa 0.23093331</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a5 aaa 0.21734703</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b5 bbb 0.36162813</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a1 aaa 0.31868299</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b1 bbb 0.29995145</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a4 aaa 0.01519166</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

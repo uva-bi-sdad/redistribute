@@ -9,7 +9,9 @@
 #' @param map A list with entries named with \code{source} IDs, containing vectors of associated
 #' \code{target} IDs.
 #' @param source_id,target_id Name of a column in \code{source} / \code{target},
-#' or a vector containing IDs.
+#' or a vector containing IDs. For \code{source}, this will default to the first column. For
+#' \code{target}, columns will be searched through for one that appears to relate to the
+#' source IDs, falling back to the first column.
 #' @param target_weight Name of a column in \code{target}, or a vector containing target weights.
 #' @param source_variable,source_value If \code{source} is tall (with variables spread across
 #' rows rather than columns), specifies names of columns in \code{source} containing variable names
@@ -40,12 +42,12 @@
 #' @export
 
 redistribute <- function(source, target, map = list(), source_id = "GEOID", target_id = source_id,
-                         target_weight = "population", source_variable = NULL, source_value = NULL,
+                         target_weight = NULL, source_variable = NULL, source_value = NULL,
                          outFile = NULL, overwrite = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
-  if (is.null(dim(source))) source <- t(source)
+  if (length(dim(source)) != 2) source <- t(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))
   if (length(source_id) > 1) {
     if (verbose) cli_alert_info("source IDs: {.arg source_id} vector")
@@ -93,22 +95,46 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
       sid <- usid
     }
   }
-  if (!is.null(dim(target)) && is.null(colnames(target))) colnames(target) <- paste0("V", seq_len(ncol(target)))
+  if (length(dim(target)) == 2 && is.null(colnames(target))) colnames(target) <- paste0("V", seq_len(ncol(target)))
   if (length(target_id) > 1) {
     if (verbose) cli_alert_info("target IDs: {.arg target_id} vector")
     tid <- target_id
-  } else if (!is.null(dim(target)) && target_id %in% colnames(target)) {
+  } else if (!is.null(target_id) && length(dim(target)) == 2 && target_id %in% colnames(target)) {
     if (verbose) cli_alert_info("target IDs: {.field {target_id}} column of {.arg target}")
     tid <- target[, target_id, drop = TRUE]
     target <- target[, colnames(target) != target_id]
   } else {
-    if (is.null(dim(target))) {
-      if (verbose) cli_alert_info("target IDs: {.arg target} vector")
-      tid <- target
+    if (length(dim(target)) != 2) {
+      if (is.null(target_weight) && is.numeric(target) && !is.null(names(target))) {
+        if (verbose) cli_alert_info("target IDs: names of {.arg target} vector; {.arg target_weight} set to {.arg target}")
+        target_weight <- unname(target)
+        tid <- names(target)
+      } else {
+        if (verbose) cli_alert_info("target IDs: {.arg target} vector")
+        tid <- target
+      }
     } else {
-      if (verbose) cli_alert_info("target IDs: {.field {colnames(target)[1]}} column of {.arg target}")
-      tid <- target[, 1, drop = TRUE]
-      target <- target[, -1, drop = FALSE]
+      idi <- 1
+      if (length(map)) {
+        tids <- unique(unlist(map, use.names = FALSE))
+        for (i in seq_len(ncol(target))) {
+          if (any(target[, i] %in% tids)) {
+            idi <- i
+            break
+          }
+        }
+      } else if (all(nchar(sid) == nchar(sid[1]))) {
+        sl <- nchar(sid[1])
+        for (i in seq_len(ncol(target))) {
+          if (any(substr(target[, i], 1, sl) %in% sid)) {
+            idi <- i
+            break
+          }
+        }
+      }
+      if (verbose) cli_alert_info("target IDs: {.field {colnames(target)[idi]}} column of {.arg target}")
+      tid <- target[, idi, drop = TRUE]
+      target <- target[, -idi, drop = FALSE]
     }
   }
   tid <- as.character(tid)
@@ -131,13 +157,13 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
     if (length(e)) e else character()
   })
   tw <- if (length(target_weight) > 1) {
-    if (verbose) cli_alert_info("target weights: provided vector")
+    if (verbose) cli_alert_info("target weights: {.arg target_weight} vector")
     if (length(target_weight) != length(tid)) cli_abort("{.arg target_weight} is not the same length as {.arg target_id}")
     target_weight
-  } else if (!is.null(dim(target)) && target_weight %in% colnames(target)) {
+  } else if (!is.null(target_weight) && length(dim(target)) == 2 && target_weight %in% colnames(target)) {
     if (verbose) cli_alert_info("target weights: {.field {target_weight}} column of {.arg target}")
     target[, target_weight, drop = TRUE]
-  } else if (is.null(dim(target))) {
+  } else if (length(dim(target)) != 2) {
     if (verbose) cli_alert_info("target weights: {.field 1}")
     rep(1, length(tid))
   } else {
@@ -152,6 +178,13 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
     }
   }
   tw <- as.numeric(tw)
+  if (anyDuplicated(tid)) {
+    agger <- if (all(tw == as.integer(tw))) "summing" else "averaging"
+    if (verbose) cli_alert_info("{.arg target_id} contains duplicates, so {agger} {.arg target_weight}s")
+    tw <- tapply(tw, tid, if (agger == "summing") sum else mean)
+    tid <- names(tw)
+    tw <- unname(tw)
+  }
   source_numeric <- vapply(seq_len(ncol(source)), function(col) is.numeric(source[, col, drop = TRUE]), TRUE)
   if (!all(source_numeric)) {
     non_numeric <- which(!source_numeric)
@@ -167,9 +200,11 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
   }
   if (verbose) {
     cli_alert_info("redistributing {.field {length(source_numeric)}} variable{?s}:")
+    var_groups <- split(colnames(source), !source_numeric)
+    names(var_groups) <- c("TRUE" = "(char)", "FALSE" = "(numb)")[names(var_groups)]
     cli_bullets(structure(
-      paste(ifelse(source_numeric, "(numb) ", "(char)"), colnames(source)),
-      names = rep("*", ncol(source))
+      vapply(names(var_groups), function(type) paste(type, paste(var_groups[[type]], collapse = ", ")), ""),
+      names = rep("*", length(var_groups))
     ))
   }
   res <- process_distribute(as.matrix(source), as.integer(source_numeric), tid, tw, map)

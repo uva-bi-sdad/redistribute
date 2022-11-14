@@ -5,9 +5,9 @@
 \title{Redistribute Data}
 \usage{
 redistribute(source, target, map = list(), source_id = "GEOID",
-  target_id = source_id, target_weight = "population",
-  source_variable = NULL, source_value = NULL, outFile = NULL,
-  overwrite = FALSE, verbose = FALSE)
+  target_id = source_id, target_weight = NULL, source_variable = NULL,
+  source_value = NULL, outFile = NULL, overwrite = FALSE,
+  verbose = FALSE)
 }
 \arguments{
 \item{source}{A matrix-like object you want to distribute from; usually this will be
@@ -20,7 +20,9 @@ the dataset you want but isn't available, and is often at a higher resolution / 
 \code{target} IDs.}
 
 \item{source_id, target_id}{Name of a column in \code{source} / \code{target},
-or a vector containing IDs.}
+or a vector containing IDs. For \code{source}, this will default to the first column. For
+\code{target}, columns will be searched through for one that appears to relate to the
+source IDs, falling back to the first column.}
 
 \item{target_weight}{Name of a column in \code{target}, or a vector containing target weights.}
 
