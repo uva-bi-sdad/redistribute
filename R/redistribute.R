@@ -11,6 +11,9 @@
 #' @param source_id,target_id Name of a column in \code{source} / \code{target},
 #' or a vector containing IDs.
 #' @param target_weight Name of a column in \code{target}, or a vector containing target weights.
+#' @param source_variable,source_value If \code{source} is tall (with variables spread across
+#' rows rather than columns), specifies names of columns in \code{source} containing variable names
+#' and values for conversion.
 #' @param outFile Path to a CSV file in which to save results.
 #' @param overwrite Logical; if \code{TRUE}, will overwrite an existing \code{outFile}.
 #' @param verbose Logical; if \code{TRUE}, will show status messages.
@@ -37,7 +40,8 @@
 #' @export
 
 redistribute <- function(source, target, map = list(), source_id = "GEOID", target_id = source_id,
-                         target_weight = "population", outFile = NULL, overwrite = FALSE, verbose = FALSE) {
+                         target_weight = "population", source_variable = NULL, source_value = NULL,
+                         outFile = NULL, overwrite = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
@@ -61,7 +65,34 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
   sid <- as.character(sid)
   vars <- colnames(source)
   if (length(sid) != nrow(source)) cli_abort("{.arg source_id} is not the same length as {.field nrow(source)}")
-  if (anyDuplicated(sid)) cli_abort("{.arg source_id} contains duplicates")
+  tall <- !is.null(source_variable) || !is.null(source_value)
+  if (tall || anyDuplicated(sid)) {
+    source_numeric <- vapply(seq_len(ncol(source)), function(col) is.numeric(source[, col, drop = TRUE]), TRUE)
+    if (is.null(source_value) && any(source_numeric)) source_value <- colnames(source)[which(source_numeric)[1]]
+    if (is.null(source_variable) && any(!source_numeric)) {
+      source_variable <- colnames(source)[
+        which.min(vapply(which(!source_numeric), function(col) length(unique(source[, col])), 0))
+      ]
+    }
+    if (is.null(source_variable) || is.null(source_value)) {
+      cli_abort("{.arg source_id} contains duplicates, and {.arg source} does not appear to be tall")
+    } else {
+      usid <- unique(sid)
+      nr <- nrow(source)
+      if (length(source_value) != nr) source_value <- source[, source_value, drop = TRUE]
+      if (length(source_variable) != nr) source_variable <- source[, source_variable, drop = TRUE]
+      ss <- split(data.frame(sid, source_value), source_variable)
+      source <- do.call(cbind, lapply(ss, function(vd) {
+        vd <- vd[!duplicated(vd[[1]]), ]
+        rownames(vd) <- vd[, 1]
+        vd[usid, 2, drop = TRUE]
+      }))
+      vars <- names(ss)
+      colnames(source) <- vars
+      source <- as.data.frame(source)
+      sid <- usid
+    }
+  }
   if (!is.null(dim(target)) && is.null(colnames(target))) colnames(target) <- paste0("V", seq_len(ncol(target)))
   if (length(target_id) > 1) {
     if (verbose) cli_alert_info("target IDs: {.arg target_id} vector")

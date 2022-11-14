@@ -5,7 +5,8 @@
 \title{Redistribute Data}
 \usage{
 redistribute(source, target, map = list(), source_id = "GEOID",
-  target_id = source_id, target_weight = "population", outFile = NULL,
+  target_id = source_id, target_weight = "population",
+  source_variable = NULL, source_value = NULL, outFile = NULL,
   overwrite = FALSE, verbose = FALSE)
 }
 \arguments{
@@ -22,6 +23,10 @@ the dataset you want but isn't available, and is often at a higher resolution / 
 or a vector containing IDs.}
 
 \item{target_weight}{Name of a column in \code{target}, or a vector containing target weights.}
+
+\item{source_variable, source_value}{If \code{source} is tall (with variables spread across
+rows rather than columns), specifies names of columns in \code{source} containing variable names
+and values for conversion.}
 
 \item{outFile}{Path to a CSV file in which to save results.}
 

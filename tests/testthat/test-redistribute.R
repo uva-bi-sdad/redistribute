@@ -29,3 +29,14 @@ test_that("multiple source IDs, with categorical variables works", {
   rownames(mres) <- NULL
   expect_equal(redistribute(source, target), mres)
 })
+
+test_that("tall works", {
+  source <- data.frame(id = 1:5, a = rnorm(5), b = rnorm(5))
+  source_tall <- data.frame(
+    id = rep(source$id, 2),
+    variable = rep(c("a", "b"), each = 5),
+    value = c(source$a, source$b)
+  )
+  target <- data.frame(id = paste0(rep(1:5, 6), 1:40), population = sample.int(1e5, 40))
+  expect_equal(redistribute(source_tall, target), redistribute(source, target))
+})

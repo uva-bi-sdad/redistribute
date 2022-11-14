@@ -6,3 +6,8 @@
 *.Rproj
 inst/doc
 /coverage/
+src-*
+debug*
+*.o
+*.so
+*.dll
