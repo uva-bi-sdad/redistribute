@@ -67,8 +67,12 @@ the dataset you want but isn't available, and is often at a higher resolution / 
 
 
 <dt>map</dt>
-<dd><p>A list with entries named with <code>source</code> IDs, containing vectors of associated
-<code>target</code> IDs.</p></dd>
+<dd><p>A list with entries named with <code>source</code> IDs (or aligning with those IDs),
+containing vectors of associated <code>target</code> IDs (or indices of those IDs). If IDs
+are related by substrings (the first characters of <code>target</code> IDs are <code>source</code> IDs),
+then a map can be automatically generated from them. If <code>source</code> and <code>target</code>
+contain <code>sf</code> geometries, a map will be made with <code><a href="https://r-spatial.github.io/sf/reference/geos_binary_pred.html" class="external-link">st_intersects</a></code>
+(<code>st_intersects(source, target)</code>).</p></dd>
 
 
 <dt>source_id, target_id</dt>
@@ -79,7 +83,8 @@ source IDs, falling back to the first column.</p></dd>
 
 
 <dt>target_weight</dt>
-<dd><p>Name of a column in <code>target</code>, or a vector containing target weights.</p></dd>
+<dd><p>Name of a column in <code>target</code>, or a vector containing target weights.
+Defaults to unit weights (a weight of 1 for each <code>target</code> entry).</p></dd>
 
 
 <dt>source_variable, source_value</dt>
@@ -143,16 +148,16 @@ and values for conversion.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    id cat        num</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b3 bbb 0.49237923</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a3 aaa 0.21784500</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  b2 bbb 0.38141331</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b4 bbb 0.46462788</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a2 aaa 0.23093331</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a5 aaa 0.21734703</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b5 bbb 0.36162813</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a1 aaa 0.31868299</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b1 bbb 0.29995145</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a4 aaa 0.01519166</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  a2 aaa 0.05564587</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  b3 bbb 0.23514460</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  a1 aaa 0.54677582</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b1 bbb 0.69918815</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  b2 bbb 0.44434504</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a3 aaa 0.08395262</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  a4 aaa 0.19602493</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  b4 bbb 0.59452522</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b5 bbb 0.02679699</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a5 aaa 0.11760076</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

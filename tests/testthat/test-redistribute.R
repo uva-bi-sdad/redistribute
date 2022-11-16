@@ -40,3 +40,25 @@ test_that("tall works", {
   target <- data.frame(id = paste0(rep(1:5, 6), 1:40), population = sample.int(1e5, 40))
   expect_equal(redistribute(source_tall, target), redistribute(source, target))
 })
+
+test_that("intersect map work", {
+  source <- sf::st_as_sf(data.frame(id = c("a", "b"), a = rnorm(2), b = rnorm(2), c = rnorm(2), geometry = c(
+    "POLYGON ((.5 .5, 1 -1, 1 1, .5 .5))", "POLYGON ((0 0, .1 -.1, .1 .1, 0 0))"
+  )), wkt = "geometry")
+  target <- data.frame(id = sample(paste0(c("a", "b"), rep(1:5, 2))), population = sample.int(1e5, 10))
+  sf::st_geometry(target) <- sf::st_geometry(source)[grepl("^b", target$id) + 1]
+  map <- sf::st_intersects(source, target)
+  expect_identical(substring(capture.output(
+    res <- redistribute(source[, -1], target, verbose = TRUE),
+    type = "message"
+  ), 3), c(
+    "source IDs: sequence, assuming map from geometries",
+    "target IDs: sequence, assuming map from geometries",
+    "map: intersections between geometries",
+    "target weights: population column of `target`",
+    "redistributing 3 variables:",
+    "(numb) a, b, c"
+  ))
+  expect_identical(redistribute(source, target, source_id = "id")[, -1], res[, -1])
+  expect_identical(redistribute(source, target, map = map, source_id = "id")[, -1], res[, -1])
+})

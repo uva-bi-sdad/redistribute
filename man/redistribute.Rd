@@ -16,15 +16,20 @@ the real or more complete dataset, and is often at a lower resolution / higher l
 \item{target}{A matrix-like object you want to distribute to: usually this will be
 the dataset you want but isn't available, and is often at a higher resolution / lower level.}
 
-\item{map}{A list with entries named with \code{source} IDs, containing vectors of associated
-\code{target} IDs.}
+\item{map}{A list with entries named with \code{source} IDs (or aligning with those IDs),
+containing vectors of associated \code{target} IDs (or indices of those IDs). If IDs
+are related by substrings (the first characters of \code{target} IDs are \code{source} IDs),
+then a map can be automatically generated from them. If \code{source} and \code{target}
+contain \code{sf} geometries, a map will be made with \code{\link[sf]{st_intersects}}
+(\code{st_intersects(source, target)}).}
 
 \item{source_id, target_id}{Name of a column in \code{source} / \code{target},
 or a vector containing IDs. For \code{source}, this will default to the first column. For
 \code{target}, columns will be searched through for one that appears to relate to the
 source IDs, falling back to the first column.}
 
-\item{target_weight}{Name of a column in \code{target}, or a vector containing target weights.}
+\item{target_weight}{Name of a column in \code{target}, or a vector containing target weights.
+Defaults to unit weights (a weight of 1 for each \code{target} entry).}
 
 \item{source_variable, source_value}{If \code{source} is tall (with variables spread across
 rows rather than columns), specifies names of columns in \code{source} containing variable names
