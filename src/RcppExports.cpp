@@ -11,23 +11,24 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // process_distribute
-NumericVector process_distribute(const NumericMatrix& s, const IntegerVector& isnum, const CharacterVector& tid, const NumericVector& weight, const List& map);
-RcppExport SEXP _redistribute_process_distribute(SEXP sSEXP, SEXP isnumSEXP, SEXP tidSEXP, SEXP weightSEXP, SEXP mapSEXP) {
+NumericVector process_distribute(const NumericMatrix& s, const IntegerVector& method, const CharacterVector& tid, const NumericVector& weight, const List& map, const bool& agg);
+RcppExport SEXP _redistribute_process_distribute(SEXP sSEXP, SEXP methodSEXP, SEXP tidSEXP, SEXP weightSEXP, SEXP mapSEXP, SEXP aggSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericMatrix& >::type s(sSEXP);
-    Rcpp::traits::input_parameter< const IntegerVector& >::type isnum(isnumSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type method(methodSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type tid(tidSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type weight(weightSEXP);
     Rcpp::traits::input_parameter< const List& >::type map(mapSEXP);
-    rcpp_result_gen = Rcpp::wrap(process_distribute(s, isnum, tid, weight, map));
+    Rcpp::traits::input_parameter< const bool& >::type agg(aggSEXP);
+    rcpp_result_gen = Rcpp::wrap(process_distribute(s, method, tid, weight, map, agg));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_redistribute_process_distribute", (DL_FUNC) &_redistribute_process_distribute, 5},
+    {"_redistribute_process_distribute", (DL_FUNC) &_redistribute_process_distribute, 6},
     {NULL, NULL, 0}
 };
 

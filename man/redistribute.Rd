@@ -4,10 +4,10 @@
 \alias{redistribute}
 \title{Redistribute Data}
 \usage{
-redistribute(source, target, map = list(), source_id = "GEOID",
-  target_id = source_id, target_weight = NULL, source_variable = NULL,
-  source_value = NULL, outFile = NULL, overwrite = FALSE,
-  verbose = FALSE)
+redistribute(source, target = NULL, map = list(), source_id = "GEOID",
+  target_id = source_id, weight = NULL, source_variable = NULL,
+  source_value = NULL, weight_agg_method = "auto", outFile = NULL,
+  overwrite = FALSE, verbose = FALSE)
 }
 \arguments{
 \item{source}{A matrix-like object you want to distribute from; usually this will be
@@ -28,12 +28,17 @@ or a vector containing IDs. For \code{source}, this will default to the first co
 \code{target}, columns will be searched through for one that appears to relate to the
 source IDs, falling back to the first column.}
 
-\item{target_weight}{Name of a column in \code{target}, or a vector containing target weights.
-Defaults to unit weights (a weight of 1 for each \code{target} entry).}
+\item{weight}{Name of a column, or a vector containing weights (or single value to apply to all cases),
+which apply to \code{target} when disaggregating, and \code{source} when aggregating.
+Defaults to unit weights (all weights are 1).}
 
 \item{source_variable, source_value}{If \code{source} is tall (with variables spread across
 rows rather than columns), specifies names of columns in \code{source} containing variable names
 and values for conversion.}
+
+\item{weight_agg_method}{Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
+Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
+is integer-like, and average otherwise).}
 
 \item{outFile}{Path to a CSV file in which to save results.}
 
@@ -42,8 +47,8 @@ and values for conversion.}
 \item{verbose}{Logical; if \code{TRUE}, will show status messages.}
 }
 \value{
-A \code{data.frame} the same dimensions as \code{target}, with an initial column
-(\code{id}) containing \code{target_ids}, and additional columns from \code{source}.
+A \code{data.frame} with a row for each \code{target_ids} (identified by the first column,
+\code{id}), and a column for each variable from \code{source}.
 }
 \description{
 Distribute data from a source frame to a target frame.

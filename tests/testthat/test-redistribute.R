@@ -55,10 +55,17 @@ test_that("intersect map work", {
     "source IDs: sequence, assuming map from geometries",
     "target IDs: sequence, assuming map from geometries",
     "map: intersections between geometries",
-    "target weights: population column of `target`",
-    "redistributing 3 variables:",
+    "weights: population column of `target`",
+    "disaggregating 3 variables:",
     "(numb) a, b, c"
   ))
   expect_identical(redistribute(source, target, source_id = "id")[, -1], res[, -1])
   expect_identical(redistribute(source, target, map = map, source_id = "id")[, -1], res[, -1])
+})
+
+test_that("aggregation works", {
+  source_original <- data.frame(id = c("a", "b"), cat = c("aaa", "bbb"), num = c(1, 2))
+  target_original <- data.frame(id = sample(paste0(c("a", "b"), rep(1:5, 2))), population = sample.int(1e5, 10))
+  source <- redistribute(source_original, target_original)
+  expect_equal(redistribute(source, target = c("a", "b")), source_original)
 })

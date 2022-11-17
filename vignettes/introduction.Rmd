@@ -1,0 +1,73 @@
+---
+title: "Introduction to Redistribution"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to Redistribution}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+*Built with R 
+`r getRversion()`*
+
+***
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.height = 4.5,
+  fig.width = 9
+)
+```
+
+The basic premise behind any form of redistribution is that a given set of
+observation can be translated to some superset or subset.
+
+This means the basic requirements for redistribution are:
+
+1. a `source` with observations
+2. a `target` without observations
+3. a `map` between `source` and `target` identifiers
+
+The map associates a given source ID to a given target ID. If one source ID maps onto many target IDs,
+then we are *disaggregating* the source observation (translating one observation to many).
+If each source ID maps into a single target ID (and potentially many source IDs are mapping onto
+that target ID), then we are *aggregating* the source observations (translating many observations to one).
+
+# Basic Example
+
+Say we have a 1 set of 5 regions.
+```{r}
+regions <- data.frame(id = 1:5)
+regions
+```
+
+## Disaggregate
+If we have a single observation for the entire set, we could disaggregate it to the regions.
+With no additional information, our best guess for the value of each region is a proportional
+split -- in this case, one fifth of the observed value for each region:
+```{r}
+# install if needed: remotes::install_github("uva-bi-sdad/redistribute")
+library(redistribute)
+
+set_value <- 1
+(redistribute(set_value, regions, verbose = TRUE))
+```
+
+Or, maybe we know a little more about the regions, such as their size; then we could use that
+information to adjust the proportion allotted to each region:
+```{r}
+regions$weight <- c(1, 10, 10, 20, 50)
+region_values <- redistribute(set_value, regions, verbose = TRUE)
+region_values
+```
+
+## Aggregate
+If we have observations for all regions, we could aggregate to a single value for the set.
+In this case, we can re-aggregate what we initially disaggregated, to recover the original observation:
+```{r}
+(redistribute(region_values, verbose = TRUE))
+```

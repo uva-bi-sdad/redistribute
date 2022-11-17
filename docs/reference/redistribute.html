@@ -21,6 +21,12 @@
       <ul class="navbar-nav me-auto"><li class="active nav-item">
   <a class="nav-link" href="../reference/index.html">Reference</a>
 </li>
+<li class="nav-item dropdown">
+  <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
+  <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/introduction.html">Introduction to Redistribution</a>
+  </div>
+</li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
 
@@ -48,10 +54,10 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">redistribute</span><span class="op">(</span><span class="va">source</span>, <span class="va">target</span>, map <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>, source_id <span class="op">=</span> <span class="st">"GEOID"</span>,</span>
-<span>  target_id <span class="op">=</span> <span class="va">source_id</span>, target_weight <span class="op">=</span> <span class="cn">NULL</span>, source_variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, outFile <span class="op">=</span> <span class="cn">NULL</span>, overwrite <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">redistribute</span><span class="op">(</span><span class="va">source</span>, target <span class="op">=</span> <span class="cn">NULL</span>, map <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>, source_id <span class="op">=</span> <span class="st">"GEOID"</span>,</span>
+<span>  target_id <span class="op">=</span> <span class="va">source_id</span>, weight <span class="op">=</span> <span class="cn">NULL</span>, source_variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, weight_agg_method <span class="op">=</span> <span class="st">"auto"</span>, outFile <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  overwrite <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -82,15 +88,22 @@ or a vector containing IDs. For <code>source</code>, this will default to the fi
 source IDs, falling back to the first column.</p></dd>
 
 
-<dt>target_weight</dt>
-<dd><p>Name of a column in <code>target</code>, or a vector containing target weights.
-Defaults to unit weights (a weight of 1 for each <code>target</code> entry).</p></dd>
+<dt>weight</dt>
+<dd><p>Name of a column, or a vector containing weights (or single value to apply to all cases),
+which apply to <code>target</code> when disaggregating, and <code>source</code> when aggregating.
+Defaults to unit weights (all weights are 1).</p></dd>
 
 
 <dt>source_variable, source_value</dt>
 <dd><p>If <code>source</code> is tall (with variables spread across
 rows rather than columns), specifies names of columns in <code>source</code> containing variable names
 and values for conversion.</p></dd>
+
+
+<dt>weight_agg_method</dt>
+<dd><p>Means of aggregating <code>weight</code>, in the case that target IDs contain duplicates.
+Options are <code>"sum"</code>, <code>"average"</code>, or <code>"auto"</code> (default; which will sum if <code>weight</code>
+is integer-like, and average otherwise).</p></dd>
 
 
 <dt>outFile</dt>
@@ -109,8 +122,8 @@ and values for conversion.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>A <code>data.frame</code> the same dimensions as <code>target</code>, with an initial column
-(<code>id</code>) containing <code>target_ids</code>, and additional columns from <code>source</code>.</p>
+<p>A <code>data.frame</code> with a row for each <code>target_ids</code> (identified by the first column,
+<code>id</code>), and a column for each variable from <code>source</code>.</p>
     </div>
 
     <div class="section level2">
@@ -122,8 +135,8 @@ and values for conversion.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> source IDs: <span style="color: #00BB00;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target IDs: `target` vector</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: all target IDs for single source</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target weights: <span style="color: #00BB00;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">1</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) a, b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id   a   b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 0.2 0.4</span>
@@ -142,22 +155,22 @@ and values for conversion.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> source IDs: <span style="color: #00BB00;">id</span> column of `source`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target IDs: <span style="color: #00BB00;">id</span> column of `target`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: first <span style="color: #00BB00;">1</span> character of target IDs</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target weights: <span style="color: #00BB00;">population</span> column of `target`</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">population</span> column of `target`</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) num</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    id cat        num</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  a2 aaa 0.05564587</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  b3 bbb 0.23514460</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  a1 aaa 0.54677582</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b1 bbb 0.69918815</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  b2 bbb 0.44434504</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a3 aaa 0.08395262</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  a4 aaa 0.19602493</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  b4 bbb 0.59452522</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b5 bbb 0.02679699</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a5 aaa 0.11760076</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    id cat       num</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b5 bbb 0.5491397</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  b4 bbb 0.1257375</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  b1 bbb 0.4212245</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  a5 aaa 0.2638693</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  b2 bbb 0.4858228</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a2 aaa 0.2435864</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  a4 aaa 0.1400755</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a1 aaa 0.2098865</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  a3 aaa 0.1425823</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 b3 bbb 0.4180755</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

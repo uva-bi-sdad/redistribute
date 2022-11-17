@@ -16,11 +16,15 @@
 #' or a vector containing IDs. For \code{source}, this will default to the first column. For
 #' \code{target}, columns will be searched through for one that appears to relate to the
 #' source IDs, falling back to the first column.
-#' @param target_weight Name of a column in \code{target}, or a vector containing target weights.
-#' Defaults to unit weights (a weight of 1 for each \code{target} entry).
+#' @param weight Name of a column, or a vector containing weights (or single value to apply to all cases),
+#' which apply to \code{target} when disaggregating, and \code{source} when aggregating.
+#' Defaults to unit weights (all weights are 1).
 #' @param source_variable,source_value If \code{source} is tall (with variables spread across
 #' rows rather than columns), specifies names of columns in \code{source} containing variable names
 #' and values for conversion.
+#' @param weight_agg_method Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
+#' Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
+#' is integer-like, and average otherwise).
 #' @param outFile Path to a CSV file in which to save results.
 #' @param overwrite Logical; if \code{TRUE}, will overwrite an existing \code{outFile}.
 #' @param verbose Logical; if \code{TRUE}, will show status messages.
@@ -37,8 +41,8 @@
 #'   population = sample.int(1e5, 10)
 #' )
 #' (redistribute(source, target, verbose = TRUE))
-#' @returns A \code{data.frame} the same dimensions as \code{target}, with an initial column
-#' (\code{id}) containing \code{target_ids}, and additional columns from \code{source}.
+#' @returns A \code{data.frame} with a row for each \code{target_ids} (identified by the first column,
+#' \code{id}), and a column for each variable from \code{source}.
 #' @importFrom cli cli_abort cli_bullets cli_alert_info
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
@@ -47,8 +51,8 @@
 #' @useDynLib redistribute, .registration = TRUE
 #' @export
 
-redistribute <- function(source, target, map = list(), source_id = "GEOID", target_id = source_id,
-                         target_weight = NULL, source_variable = NULL, source_value = NULL,
+redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID", target_id = source_id,
+                         weight = NULL, source_variable = NULL, source_value = NULL, weight_agg_method = "auto",
                          outFile = NULL, overwrite = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
@@ -81,8 +85,16 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
   }
   sid <- as.character(sid)
   if (length(sid) != nrow(source)) cli_abort("{.arg source_id} is not the same length as {.field nrow(source)}")
-  tall <- !is.null(source_variable) || !is.null(source_value)
-  if (tall || anyDuplicated(sid)) {
+  if (anyDuplicated(sid)) {
+    if (is.null(source_variable)) {
+      if ("variable" %in% colnames(source)) source_variable <- "variable"
+      if ("measure" %in% colnames(source)) source_variable <- "measure"
+    }
+    if (is.null(source_value)) {
+      if ("value" %in% colnames(source)) source_value <- "value"
+    }
+  }
+  if (!is.null(source_variable) || !is.null(source_value)) {
     source_numeric <- vapply(seq_len(ncol(source)), function(col) is.numeric(source[, col, drop = TRUE]), TRUE)
     if (is.null(source_value) && any(source_numeric)) source_value <- colnames(source)[which(source_numeric)[1]]
     if (is.null(source_variable) && any(!source_numeric)) {
@@ -90,37 +102,45 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
         which.min(vapply(which(!source_numeric), function(col) length(unique(source[, col])), 0))
       ]
     }
-    if (is.null(source_variable) || is.null(source_value)) {
-      cli_abort("{.arg source_id} contains duplicates, and {.arg source} does not appear to be tall")
-    } else {
-      usid <- unique(sid)
-      nr <- nrow(source)
-      if (length(source_value) != nr) source_value <- source[, source_value, drop = TRUE]
-      if (length(source_variable) != nr) source_variable <- source[, source_variable, drop = TRUE]
-      ss <- split(data.frame(sid, source_value), source_variable)
-      source <- do.call(cbind, lapply(ss, function(vd) {
-        vd <- vd[!duplicated(vd[[1]]), ]
-        rownames(vd) <- vd[, 1]
-        vd[usid, 2, drop = TRUE]
-      }))
-      colnames(source) <- names(ss)
-      source <- as.data.frame(source)
-      sid <- usid
+    if (verbose) {
+      cli_alert_info(paste(
+        "converting {.arg source} format, breaking",
+        if (length(source_value) == 1) "{.field {source_value}}" else "{.arg source_value}",
+        "values across",
+        if (length(source_variable) == 1) "{.field {source_variable}}" else "{.arg source_variable}",
+        "columns"
+      ))
     }
+    usid <- unique(sid)
+    nr <- nrow(source)
+    if (length(source_value) != nr) source_value <- source[, source_value, drop = TRUE]
+    if (length(source_variable) != nr) source_variable <- source[, source_variable, drop = TRUE]
+    ss <- split(data.frame(sid, source_value), source_variable)
+    source <- do.call(cbind, lapply(ss, function(vd) {
+      vd <- vd[!duplicated(vd[[1]]), ]
+      rownames(vd) <- vd[, 1]
+      vd[usid, 2, drop = TRUE]
+    }))
+    colnames(source) <- names(ss)
+    source <- as.data.frame(source)
+    sid <- usid
   }
   if (length(dim(target)) == 2 && is.null(colnames(target))) colnames(target) <- paste0("V", seq_len(ncol(target)))
   if (length(target_id) > 1) {
     if (verbose) cli_alert_info("target IDs: {.arg target_id} vector")
     tid <- target_id
+  } else if (is.null(target)) {
+    if (verbose) cli_alert_info("target IDs: {.field 1}")
+    tid <- 1
   } else if (!is.null(target_id) && length(dim(target)) == 2 && target_id %in% colnames(target)) {
     if (verbose) cli_alert_info("target IDs: {.field {target_id}} column of {.arg target}")
     tid <- target[, target_id, drop = TRUE]
     target <- target[, colnames(target) != target_id]
   } else {
     if (length(dim(target)) != 2) {
-      if (is.null(target_weight) && is.numeric(target) && !is.null(names(target))) {
-        if (verbose) cli_alert_info("target IDs: names of {.arg target} vector; {.arg target_weight} set to {.arg target}")
-        target_weight <- unname(target)
+      if (is.null(weight) && is.numeric(target) && !is.null(names(target))) {
+        if (verbose) cli_alert_info("target IDs: names of {.arg target} vector; {.arg weight} set to {.arg target}")
+        weight <- unname(target)
         tid <- names(target)
       } else {
         if (verbose) cli_alert_info("target IDs: {.arg target} vector")
@@ -157,6 +177,8 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
     }
   }
   tid <- as.character(tid)
+  aggregate <- length(sid) > length(tid)
+  if (!aggregate && anyDuplicated(sid)) cli_abort("")
   if (length(map)) {
     if (verbose) cli_alert_info("map: provided list")
     if (is.null(names(map))) {
@@ -167,6 +189,12 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
     if (nrow(source) == 1) {
       if (verbose) cli_alert_info("map: all target IDs for single source")
       map[[sid]] <- tid
+    } else if (is.null(target) || length(tid) == 1) {
+      if (verbose) cli_alert_info("map: all source IDs to a single target")
+      map <- as.list(structure(rep(tid, length(sid)), names = sid))
+    } else if (aggregate && !intersect_map && all(nchar(tid) == nchar(tid[1])) && nchar(sid[1]) > nchar(tid[1])) {
+      if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of source IDs")
+      map <- as.list(structure(substr(sid, 1, nchar(tid[1])), names = sid))
     } else if (!intersect_map && all(nchar(sid) == nchar(sid[1])) && nchar(tid[1]) > nchar(sid[1])) {
       if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of target IDs")
       map <- split(tid, substr(tid, 1, nchar(sid[1])))
@@ -186,42 +214,71 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
       cli_abort("no map was provided, and could not make one from IDs")
     }
   }
+  if (aggregate && length(map) == length(tid)) {
+    if (is.null(names(map))) names(map) <- seq_along(map)
+    map <- as.list(structure(
+      unlist(map, use.names = FALSE),
+      names = rep(names(map), vapply(map, length, 0))
+    ))
+  }
   map <- lapply(sid, function(id) {
     e <- map[[id]]
     if (length(e)) {
+      if (aggregate && length(e) != 1) {
+        cli_abort(c(
+          x = "decided to aggregate, but ID {id} does not map to a single target",
+          i = "if {.arg source} is tall, specify {.arg source_variable} or {.arg source_value}} to convert it"
+        ))
+      }
       if (is.integer(e)) tid[e] else e
     } else {
       character()
     }
   })
-  tw <- if (length(target_weight) > 1) {
-    if (verbose) cli_alert_info("target weights: {.arg target_weight} vector")
-    if (length(target_weight) != length(tid)) cli_abort("{.arg target_weight} is not the same length as {.arg target_id}")
-    target_weight
-  } else if (!is.null(target_weight) && length(dim(target)) == 2 && target_weight %in% colnames(target)) {
-    if (verbose) cli_alert_info("target weights: {.field {target_weight}} column of {.arg target}")
-    target[, target_weight, drop = TRUE]
-  } else if (length(dim(target)) != 2) {
-    if (verbose) cli_alert_info("target weights: {.field 1}")
-    rep(1, length(tid))
+  nout <- length(if (aggregate) sid else tid)
+  w <- if (length(weight) > 1) {
+    if (verbose) cli_alert_info("weights: {.arg weight} vector")
+    if (length(weight) != nout) {
+      cli_abort("{.arg weight} is not the same length as {.arg {if (aggregate) 'source' else 'target'}} IDs")
+    }
+    weight
+  } else if ((aggregate && (is.null(weight) || !weight %in% colnames(source))) || length(dim(target)) != 2) {
+    weight <- if (!is.numeric(weight)) 1 else weight
+    if (verbose) cli_alert_info("weights: {.field {weight}}")
+    rep(weight, nout)
+  } else if (aggregate && !is.null(weight)) {
+    if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg source}")
+    w <- source[, weight, drop = TRUE]
+    source <- source[, colnames(weight) != weight, drop = FALSE]
+    w
   } else {
-    su <- vapply(seq_len(ncol(target)), function(col) is.numeric(target[, col, drop = TRUE]), TRUE)
-    if (any(su)) {
-      target_weight <- colnames(target)[which(su)[1]]
-      if (verbose) cli_alert_info("target weights: {.field {target_weight}} column of {.arg target}")
-      target[, target_weight, drop = TRUE]
+    if (!is.null(weight) && weight %in% colnames(target)) {
+      if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg target}")
+      target[, weight, drop = TRUE]
     } else {
-      if (verbose) cli_alert_info("target weights: {.field 1}")
-      rep(1, length(tid))
+      su <- vapply(seq_len(ncol(target)), function(col) is.numeric(target[, col, drop = TRUE]), TRUE)
+      if (any(su)) {
+        weight <- colnames(target)[which(su)[1]]
+        if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg target}")
+        target[, weight, drop = TRUE]
+      } else {
+        if (verbose) cli_alert_info("weights: {.field 1}")
+        rep(1, length(tid))
+      }
     }
   }
-  tw <- as.numeric(tw)
-  if (anyDuplicated(tid)) {
-    agger <- if (all(tw == as.integer(tw))) "summing" else "averaging"
-    if (verbose) cli_alert_info("{.arg target_id} contains duplicates, so {agger} {.arg target_weight}s")
-    tw <- tapply(tw, tid, if (agger == "summing") sum else mean)
-    tid <- names(tw)
-    tw <- unname(tw)
+  w <- as.numeric(w)
+  realign <- FALSE
+  if (!aggregate && anyDuplicated(tid)) {
+    realign <- TRUE
+    otid <- tid
+    agger <- if (weight_agg_method == "auto") {
+      if (all(w == as.integer(w))) "summing" else "averaging"
+    } else if (grepl("^[Ss]", weight_agg_method)) "summing" else "averaging"
+    if (verbose) cli_alert_info("{.arg target_id} contains duplicates, so {agger} {.arg weight}s")
+    w <- tapply(w, tid, if (agger == "summing") sum else mean)
+    tid <- names(w)
+    w <- unname(w)
   }
   if (source_sf) st_geometry(source) <- NULL
   source_numeric <- vapply(seq_len(ncol(source)), function(col) is.numeric(source[, col, drop = TRUE]), TRUE)
@@ -238,7 +295,7 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
     }
   }
   if (verbose) {
-    cli_alert_info("redistributing {.field {length(source_numeric)}} variable{?s}:")
+    cli_alert_info("{if (aggregate) 'aggregating' else 'disaggregating'} {.field {length(source_numeric)}} variable{?s}:")
     var_groups <- split(colnames(source), !source_numeric)
     names(var_groups) <- c("TRUE" = "(char)", "FALSE" = "(numb)")[names(var_groups)]
     cli_bullets(structure(
@@ -246,7 +303,9 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
       names = rep("*", length(var_groups))
     ))
   }
-  res <- process_distribute(as.matrix(source), as.integer(source_numeric), tid, tw, map)
+  method <- as.integer(source_numeric)
+  if (aggregate) method <- method + 10
+  res <- process_distribute(as.matrix(source), method, tid, w, map, aggregate)
   res <- as.data.frame(res)
   colnames(res) <- colnames(source)
   if (!all(source_numeric)) {
@@ -258,6 +317,12 @@ redistribute <- function(source, target, map = list(), source_id = "GEOID", targ
     }
   }
   res <- cbind(id = tid, res)
+  if (realign) {
+    if (verbose) cli_alert_info("realigning with duplicated target IDs")
+    rownames(res) <- tid
+    res <- res[otid, ]
+    rownames(res) <- NULL
+  }
   if (!is.null(outFile)) {
     if (verbose) cli_alert_info("writing results to {.file {outFile}}")
     dir.create(dirname(outFile), FALSE, TRUE)
