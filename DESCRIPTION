@@ -11,7 +11,7 @@ Description: Offers a variety of methods to redistribute (aggregate, disaggregat
   (such as alternate, or sub- or super-geographies).
 URL: https://github.com/uva-bi-sdad/redistribute
 BugReports: https://github.com/uva-bi-sdad/redistribute/issues
-Imports: cli, Rcpp, RcppParallel, sf
+Imports: cli, Rcpp, RcppParallel, s2, sf
 License: MIT + file LICENSE
 RoxygenNote: 7.2.2
 Roxygen: list(old_usage = TRUE)

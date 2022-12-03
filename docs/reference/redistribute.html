@@ -56,8 +56,10 @@
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">redistribute</span><span class="op">(</span><span class="va">source</span>, target <span class="op">=</span> <span class="cn">NULL</span>, map <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>, source_id <span class="op">=</span> <span class="st">"GEOID"</span>,</span>
 <span>  target_id <span class="op">=</span> <span class="va">source_id</span>, weight <span class="op">=</span> <span class="cn">NULL</span>, source_variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, weight_agg_method <span class="op">=</span> <span class="st">"auto"</span>, outFile <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  overwrite <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, aggregate <span class="op">=</span> <span class="cn">NULL</span>, weight_agg_method <span class="op">=</span> <span class="st">"auto"</span>,</span>
+<span>  outFile <span class="op">=</span> <span class="cn">NULL</span>, overwrite <span class="op">=</span> <span class="cn">FALSE</span>, make_intersect_map <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  overlaps <span class="op">=</span> <span class="st">"keep"</span>, return_geometry <span class="op">=</span> <span class="cn">TRUE</span>, return_map <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -74,11 +76,14 @@ the dataset you want but isn't available, and is often at a higher resolution / 
 
 <dt>map</dt>
 <dd><p>A list with entries named with <code>source</code> IDs (or aligning with those IDs),
-containing vectors of associated <code>target</code> IDs (or indices of those IDs). If IDs
-are related by substrings (the first characters of <code>target</code> IDs are <code>source</code> IDs),
+containing vectors of associated <code>target</code> IDs (or indices of those IDs). Entries
+can also be numeric vectors with IDs as names, which will be used to weigh the relationship.
+If IDs are related by substrings (the first characters of <code>target</code> IDs are <code>source</code> IDs),
 then a map can be automatically generated from them. If <code>source</code> and <code>target</code>
 contain <code>sf</code> geometries, a map will be made with <code><a href="https://r-spatial.github.io/sf/reference/geos_binary_pred.html" class="external-link">st_intersects</a></code>
-(<code>st_intersects(source, target)</code>).</p></dd>
+(<code>st_intersects(source, target)</code>). If an intersects map is made, and <code>source</code>
+is being aggregated to <code>target</code>, and map entries contain multiple target IDs,
+those entries will be weighted by their proportion of overlap with the source area.</p></dd>
 
 
 <dt>source_id, target_id</dt>
@@ -100,6 +105,12 @@ rows rather than columns), specifies names of columns in <code>source</code> con
 and values for conversion.</p></dd>
 
 
+<dt>aggregate</dt>
+<dd><p>Logical; if specified, will determine whether to aggregate or disaggregate
+from <code>source</code> to <code>target</code>. Otherwise, this will be <code>TRUE</code> if there are more
+<code>source</code> observations than <code>target</code> observations.</p></dd>
+
+
 <dt>weight_agg_method</dt>
 <dd><p>Means of aggregating <code>weight</code>, in the case that target IDs contain duplicates.
 Options are <code>"sum"</code>, <code>"average"</code>, or <code>"auto"</code> (default; which will sum if <code>weight</code>
@@ -112,6 +123,29 @@ is integer-like, and average otherwise).</p></dd>
 
 <dt>overwrite</dt>
 <dd><p>Logical; if <code>TRUE</code>, will overwrite an existing <code>outFile</code>.</p></dd>
+
+
+<dt>make_intersect_map</dt>
+<dd><p>Logical; if <code>TRUE</code>, will opt to calculate an intersect-based map
+rather than an ID-based map, if both seem possible. If specified as <code>FALSE</code>, will
+never calculate an intersect-based map.</p></dd>
+
+
+<dt>overlaps</dt>
+<dd><p>If specified and not <code>TRUE</code> or <code>"keep"</code>, will assign <code>target</code>
+entities that are mapped to multiple <code>source</code> entities to a single source entity. The value
+determines how entities with the same weight should be assigned, between <code>"first"</code> (default),
+<code>"last"</code>, and <code>"random"</code>.</p></dd>
+
+
+<dt>return_geometry</dt>
+<dd><p>Logical; if <code>FALSE</code>, will not set the returned <code>data.frame</code>'s
+geometry to that of <code>target</code>, if it exists.</p></dd>
+
+
+<dt>return_map</dt>
+<dd><p>Logical; if <code>TRUE</code>, will only return the map, without performing the
+redistribution. Useful if you want to inspect an automatically created map, or use it in a later call.</p></dd>
 
 
 <dt>verbose</dt>
@@ -137,7 +171,7 @@ is integer-like, and average otherwise).</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: all target IDs for single source</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) a, b</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 2) a, b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id   a   b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 0.2 0.4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2  2 0.2 0.4</span>
@@ -157,20 +191,20 @@ is integer-like, and average otherwise).</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: first <span style="color: #00BB00;">1</span> character of target IDs</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">population</span> column of `target`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb) num</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char) cat</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 1) num</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char; 1) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    id cat       num</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b5 bbb 0.5491397</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  b4 bbb 0.1257375</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  b1 bbb 0.4212245</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  a5 aaa 0.2638693</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  b2 bbb 0.4858228</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a2 aaa 0.2435864</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  a4 aaa 0.1400755</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a1 aaa 0.2098865</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  a3 aaa 0.1425823</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 b3 bbb 0.4180755</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    id cat        num</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b3 bbb 0.45249817</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a3 aaa 0.17858705</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  b5 bbb 0.14553715</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b2 bbb 0.57044228</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a5 aaa 0.01643439</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a2 aaa 0.30489966</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b4 bbb 0.47239257</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a4 aaa 0.15564202</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b1 bbb 0.35912983</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a1 aaa 0.34443688</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

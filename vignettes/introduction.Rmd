@@ -19,8 +19,9 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.height = 4.5,
-  fig.width = 9
+  fig.width = 8.1
 )
+library(sf)
 ```
 
 The basic premise behind any form of redistribution is that a given set of
@@ -30,7 +31,7 @@ This means the basic requirements for redistribution are:
 
 1. a `source` with observations
 2. a `target` without observations
-3. a `map` between `source` and `target` identifiers
+3. a `map` between `source` and `target` entities
 
 The map associates a given source ID to a given target ID. If one source ID maps onto many target IDs,
 then we are *disaggregating* the source observation (translating one observation to many).
@@ -39,7 +40,7 @@ that target ID), then we are *aggregating* the source observations (translating 
 
 # Basic Example
 
-Say we have a 1 set of 5 regions.
+Say we have 1 set of 5 regions:
 ```{r}
 regions <- data.frame(id = 1:5)
 regions
@@ -70,4 +71,79 @@ If we have observations for all regions, we could aggregate to a single value fo
 In this case, we can re-aggregate what we initially disaggregated, to recover the original observation:
 ```{r}
 (redistribute(region_values, verbose = TRUE))
+```
+
+# Applied Example
+
+One use case for redistribution is converting demographics data between geographic layers.
+
+For illustration, we can look at U.S. Census data in Fairfax, Virginia:
+```{r}
+# remotes::install_github("uva-bi-sdad/catchment")
+library(catchment)
+library(sf)
+
+# download population and data shapes
+population <- download_census_population("~/Downloads", "VA", 2020)$estimates
+population <- population[grepl("^51(?:059|600)", population$GEOID), ]
+rownames(population) <- population$GEOID
+block_groups <- st_transform(
+  download_census_shapes("~/Downloads", "VA", "bg", year = 2020), "WGS84"
+)
+block_groups <- block_groups[block_groups$GEOID %in% population$GEOID, ]
+population <- population[block_groups$GEOID, ]
+st_geometry(population) <- block_groups$geometry
+population$Overall <- population$TOTAL.POPULATION_Total
+
+# prepare a map
+library(leaflet)
+pal <- colorNumeric(scico::scico(255, palette = "lajolla"), population$Overall)
+map <- leaflet(population, options = leafletOptions(attributionControl = FALSE)) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addScaleBar("bottomleft") |>
+  addControl("Total Population", "topright") |>
+  addLayersControl(
+    position = "topleft", overlayGroups = c("Block Groups", "Zip Codes")
+  ) |>
+  addLegend(
+    "bottomright", pal, ~Overall,
+    title = "Block Groups", group = "Block Groups", opacity = 1
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(Overall), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Block Groups", label = ~ paste0("Total Population: ", round(Overall, 3))
+  )
+```
+
+This population information is provided at the Census Block Group level at the lowest,
+but we might like to look at population within zip codes, which is not provided.
+```{r}
+# Download shapes if needed
+zipcode_file <- "~/Downloads/zipcode_va_fairfax.geojson"
+if (!file.exists(zipcode_file)) {
+  download.file(paste0(
+    "https://services1.arcgis.com/ioennV6PpG5Xodq0/ArcGIS/rest/",
+    "services/OpenData_S1/FeatureServer/21/query?where=1%3D1&f=geojson"
+  ), zipcode_file)
+}
+zipcodes <- read_sf(zipcode_file)
+
+# redistribute population data from block groups
+zipcode_population <- redistribute(population, zipcodes, verbose = TRUE)
+pal_zip <- colorNumeric(
+  scico::scico(255, palette = "lajolla"),
+  zipcode_population$Overall
+)
+map |>
+  addPolygons(
+    data = zipcode_population,
+    fillColor = ~ pal_zip(Overall), fillOpacity = .8, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Zip Codes", label = ~ paste0("Total Population: ", round(Overall, 3))
+  ) |>
+  addLegend(
+    "bottomright", pal_zip, zipcode_population$Overall,
+    opacity = 1, title = "Zip Codes", group = "Zip Codes"
+  )
 ```

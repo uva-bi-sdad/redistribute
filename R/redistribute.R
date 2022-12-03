@@ -7,11 +7,14 @@
 #' @param target A matrix-like object you want to distribute to: usually this will be
 #' the dataset you want but isn't available, and is often at a higher resolution / lower level.
 #' @param map A list with entries named with \code{source} IDs (or aligning with those IDs),
-#' containing vectors of associated \code{target} IDs (or indices of those IDs). If IDs
-#' are related by substrings (the first characters of \code{target} IDs are \code{source} IDs),
+#' containing vectors of associated \code{target} IDs (or indices of those IDs). Entries
+#' can also be numeric vectors with IDs as names, which will be used to weigh the relationship.
+#' If IDs are related by substrings (the first characters of \code{target} IDs are \code{source} IDs),
 #' then a map can be automatically generated from them. If \code{source} and \code{target}
 #' contain \code{sf} geometries, a map will be made with \code{\link[sf]{st_intersects}}
-#' (\code{st_intersects(source, target)}).
+#' (\code{st_intersects(source, target)}). If an intersects map is made, and \code{source}
+#' is being aggregated to \code{target}, and map entries contain multiple target IDs,
+#' those entries will be weighted by their proportion of overlap with the source area.
 #' @param source_id,target_id Name of a column in \code{source} / \code{target},
 #' or a vector containing IDs. For \code{source}, this will default to the first column. For
 #' \code{target}, columns will be searched through for one that appears to relate to the
@@ -22,11 +25,25 @@
 #' @param source_variable,source_value If \code{source} is tall (with variables spread across
 #' rows rather than columns), specifies names of columns in \code{source} containing variable names
 #' and values for conversion.
+#' @param aggregate Logical; if specified, will determine whether to aggregate or disaggregate
+#' from \code{source} to \code{target}. Otherwise, this will be \code{TRUE} if there are more
+#' \code{source} observations than \code{target} observations.
 #' @param weight_agg_method Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
 #' Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
 #' is integer-like, and average otherwise).
 #' @param outFile Path to a CSV file in which to save results.
 #' @param overwrite Logical; if \code{TRUE}, will overwrite an existing \code{outFile}.
+#' @param make_intersect_map Logical; if \code{TRUE}, will opt to calculate an intersect-based map
+#' rather than an ID-based map, if both seem possible. If specified as \code{FALSE}, will
+#' never calculate an intersect-based map.
+#' @param overlaps If specified and not \code{TRUE} or \code{"keep"}, will assign \code{target}
+#' entities that are mapped to multiple \code{source} entities to a single source entity. The value
+#' determines how entities with the same weight should be assigned, between \code{"first"} (default),
+#' \code{"last"}, and \code{"random"}.
+#' @param return_geometry Logical; if \code{FALSE}, will not set the returned \code{data.frame}'s
+#' geometry to that of \code{target}, if it exists.
+#' @param return_map Logical; if \code{TRUE}, will only return the map, without performing the
+#' redistribution. Useful if you want to inspect an automatically created map, or use it in a later call.
 #' @param verbose Logical; if \code{TRUE}, will show status messages.
 #' @examples
 #' # minimal example
@@ -47,18 +64,21 @@
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
 #' @importFrom utils write.csv
-#' @importFrom sf st_intersects st_geometry<-
+#' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_crs<-
+#' @importFrom s2 s2_area
 #' @useDynLib redistribute, .registration = TRUE
 #' @export
 
 redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID", target_id = source_id,
-                         weight = NULL, source_variable = NULL, source_value = NULL, weight_agg_method = "auto",
-                         outFile = NULL, overwrite = FALSE, verbose = FALSE) {
+                         weight = NULL, source_variable = NULL, source_value = NULL, aggregate = NULL,
+                         weight_agg_method = "auto", outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
+                         overlaps = "keep", return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
-  source_sf <- inherits(source, "sf")
-  target_sf <- inherits(target, "sf")
+  can_intersects <- missing(make_intersect_map) || make_intersect_map
+  source_sf <- can_intersects && inherits(source, "sf")
+  target_sf <- can_intersects && inherits(target, "sf")
   intersect_map <- FALSE
   if (length(dim(source)) != 2) source <- t(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))
@@ -147,7 +167,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
         tid <- target
       }
     } else {
-      if (target_sf && source_sf) {
+      if (can_intersects && target_sf && source_sf) {
         if (verbose) cli_alert_info("target IDs: sequence, assuming map from geometries")
         intersect_map <- TRUE
         tid <- seq_len(nrow(target))
@@ -177,10 +197,11 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     }
   }
   tid <- as.character(tid)
-  aggregate <- length(sid) > length(tid)
-  if (!aggregate && anyDuplicated(sid)) cli_abort("")
+  if (!is.logical(aggregate)) aggregate <- length(sid) > length(tid)
+  if (make_intersect_map && source_sf && target_sf) intersect_map <- TRUE
   if (length(map)) {
     if (verbose) cli_alert_info("map: provided list")
+    intersect_map <- FALSE
     if (is.null(names(map))) {
       if (length(map) != length(sid)) cli_abort("{.arg map} has no names, and is not the same length as source IDs")
       names(map) <- sid
@@ -188,21 +209,26 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   } else {
     if (nrow(source) == 1) {
       if (verbose) cli_alert_info("map: all target IDs for single source")
+      intersect_map <- FALSE
       map[[sid]] <- tid
     } else if (is.null(target) || length(tid) == 1) {
       if (verbose) cli_alert_info("map: all source IDs to a single target")
+      intersect_map <- FALSE
       map <- as.list(structure(rep(tid, length(sid)), names = sid))
     } else if (aggregate && !intersect_map && all(nchar(tid) == nchar(tid[1])) && nchar(sid[1]) > nchar(tid[1])) {
       if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of source IDs")
+      intersect_map <- FALSE
       map <- as.list(structure(substr(sid, 1, nchar(tid[1])), names = sid))
     } else if (!intersect_map && all(nchar(sid) == nchar(sid[1])) && nchar(tid[1]) > nchar(sid[1])) {
       if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of target IDs")
       map <- split(tid, substr(tid, 1, nchar(sid[1])))
-    } else if (source_sf && target_sf) {
+    } else if (can_intersects && source_sf && target_sf) {
       if (verbose) cli_alert_info("map: intersections between geometries")
+      intersect_map <- TRUE
       op <- options(sf_use_s2 = FALSE)
       on.exit(options(sf_use_s2 = op[[1]]))
-      map <- tryCatch(st_intersects(source, target), error = function(e) NULL)
+      if (st_crs(source) != st_crs(target)) st_crs(target) <- st_crs(source)
+      map <- tryCatch(suppressMessages(st_intersects(st_geometry(source), st_geometry(target))), error = function(e) NULL)
       if (is.null(map)) {
         cli_abort(c(
           x = "{.fn st_intersects} failed between {.arg source} and {.arg target}",
@@ -214,27 +240,67 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       cli_abort("no map was provided, and could not make one from IDs")
     }
   }
-  if (aggregate && length(map) == length(tid)) {
-    if (is.null(names(map))) names(map) <- seq_along(map)
-    map <- as.list(structure(
-      unlist(map, use.names = FALSE),
-      names = rep(names(map), vapply(map, length, 0))
-    ))
+  if (aggregate && length(map) == length(tid) && length(map) != length(sid)) {
+    ids <- if (is.null(names(map))) seq_along(map) else names(map)
+    names(map) <- NULL
+    child_counts <- vapply(map, length, 0)
+    map <- as.list(unlist(map))
+    names(map) <- rep(ids, child_counts)
   }
+  if (intersect_map) {
+    if (st_crs(source) != st_crs(target)) st_crs(target) <- st_crs(source)
+    source_geom <- st_geometry(source)
+    names(source_geom) <- sid
+  }
+  if (is.logical(overlaps) && overlaps) {
+    dodedupe <- FALSE
+  } else {
+    tiebreak <- c(k = NULL, f = "first", l = "last", r = "random")[tolower(substring(overlaps, 1, 1))]
+    dodedupe <- is.null(tiebreak)
+    deduper <- function(e, tm = tiebreak) {
+      su <- which(e == max(e))
+      if (length(su) > 1) {
+        su <- switch(tm,
+          first = su[1],
+          last = su[length(su)],
+          random = sample(su, 1)
+        )
+      }
+      e[su]
+    }
+  }
+  any_partial <- FALSE
   map <- lapply(sid, function(id) {
     e <- map[[id]]
     if (length(e)) {
-      if (aggregate && length(e) != 1) {
-        cli_abort(c(
-          x = "decided to aggregate, but ID {id} does not map to a single target",
-          i = "if {.arg source} is tall, specify {.arg source_variable} or {.arg source_value}} to convert it"
-        ))
+      res <- if (is.null(names(e))) {
+        w <- if (intersect_map && length(e) != 1) {
+          reg <- st_geometry(target)[e]
+          part <- suppressMessages(st_intersection(reg, source_geom[id]))
+          s2_area(part) / s2_area(if (aggregate) source_geom[[id]] else reg)
+        } else {
+          rep(1, length(e))
+        }
+        names(w) <- if (is.integer(e)) tid[e] else e
+        w
+      } else {
+        e
       }
-      if (is.integer(e)) tid[e] else e
+      if (dodedupe) {
+        deduper(res)
+      } else {
+        if (!aggregate && any(res != 1)) any_partial <<- TRUE
+        res
+      }
     } else {
-      character()
+      numeric()
     }
   })
+  names(map) <- sid
+  if (return_map) {
+    if (verbose) cli_alert_info("returning map")
+    return(map)
+  }
   nout <- length(if (aggregate) sid else tid)
   w <- if (length(weight) > 1) {
     if (verbose) cli_alert_info("weights: {.arg weight} vector")
@@ -280,7 +346,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     tid <- names(w)
     w <- unname(w)
   }
-  if (source_sf) st_geometry(source) <- NULL
+  if (inherits(source, "sf")) st_geometry(source) <- NULL
   source_numeric <- vapply(seq_len(ncol(source)), function(col) is.numeric(source[, col, drop = TRUE]), TRUE)
   if (!all(source_numeric)) {
     non_numeric <- which(!source_numeric)
@@ -297,14 +363,22 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   if (verbose) {
     cli_alert_info("{if (aggregate) 'aggregating' else 'disaggregating'} {.field {length(source_numeric)}} variable{?s}:")
     var_groups <- split(colnames(source), !source_numeric)
-    names(var_groups) <- c("TRUE" = "(char)", "FALSE" = "(numb)")[names(var_groups)]
+    names(var_groups) <- c(
+      "TRUE" = "(char; {sum(!source_numeric)})", "FALSE" = "(numb; {sum(source_numeric)})"
+    )[names(var_groups)]
     cli_bullets(structure(
-      vapply(names(var_groups), function(type) paste(type, paste(var_groups[[type]], collapse = ", ")), ""),
+      vapply(names(var_groups), function(type) {
+        paste(type, if (length(var_groups[[type]]) < 10) paste(var_groups[[type]], collapse = ", "))
+      }, ""),
       names = rep("*", length(var_groups))
     ))
   }
   method <- as.integer(source_numeric)
-  if (aggregate) method <- method + 10
+  if (any_partial) aggregate <- TRUE
+  if (aggregate) {
+    method <- method + 10
+    if (any_partial) method[method == 11] <- 12
+  }
   res <- process_distribute(as.matrix(source), method, tid, w, map, aggregate)
   res <- as.data.frame(res)
   colnames(res) <- colnames(source)
@@ -329,5 +403,6 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     if (!grepl("\\.\\w", outFile)) outFile <- paste0(outFile, ".csv")
     write.csv(res, outFile, row.names = FALSE)
   }
+  if (return_geometry && target_sf) st_geometry(res) <- st_geometry(target)
   invisible(res)
 }
