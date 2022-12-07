@@ -11,8 +11,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // process_distribute
-NumericVector process_distribute(const NumericMatrix& s, const IntegerVector& method, const CharacterVector& tid, const NumericVector& weight, const List& map, const bool& agg);
-RcppExport SEXP _redistribute_process_distribute(SEXP sSEXP, SEXP methodSEXP, SEXP tidSEXP, SEXP weightSEXP, SEXP mapSEXP, SEXP aggSEXP) {
+NumericVector process_distribute(const NumericMatrix& s, const IntegerVector& method, const CharacterVector& tid, const NumericVector& weight, const List& map, const bool& agg, const bool& balance);
+RcppExport SEXP _redistribute_process_distribute(SEXP sSEXP, SEXP methodSEXP, SEXP tidSEXP, SEXP weightSEXP, SEXP mapSEXP, SEXP aggSEXP, SEXP balanceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,13 +22,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const NumericVector& >::type weight(weightSEXP);
     Rcpp::traits::input_parameter< const List& >::type map(mapSEXP);
     Rcpp::traits::input_parameter< const bool& >::type agg(aggSEXP);
-    rcpp_result_gen = Rcpp::wrap(process_distribute(s, method, tid, weight, map, agg));
+    Rcpp::traits::input_parameter< const bool& >::type balance(balanceSEXP);
+    rcpp_result_gen = Rcpp::wrap(process_distribute(s, method, tid, weight, map, agg, balance));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_redistribute_process_distribute", (DL_FUNC) &_redistribute_process_distribute, 6},
+    {"_redistribute_process_distribute", (DL_FUNC) &_redistribute_process_distribute, 7},
     {NULL, NULL, 0}
 };
 

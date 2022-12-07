@@ -144,8 +144,10 @@ struct Distribute : public Worker {
 };
 
 // [[Rcpp::export]]
-NumericVector process_distribute(const NumericMatrix &s, const IntegerVector &method,
-  const CharacterVector &tid, const NumericVector &weight, const List &map, const bool &agg) {
+NumericVector process_distribute(
+    const NumericMatrix &s, const IntegerVector &method, const CharacterVector &tid,
+    const NumericVector &weight, const List &map, const bool &agg, const bool &balance
+  ) {
   const int source_n = s.nrow(), nvars = s.ncol(), target_n = tid.length();
   NumericVector res(nvars * target_n);
 
@@ -154,9 +156,9 @@ NumericVector process_distribute(const NumericMatrix &s, const IntegerVector &me
   vector<int> start(iter_max), end(iter_max), index;
   vector<double> weight_totals(source_n), index_weight;
   if (agg) {
-    unordered_map<String, int> timap;
     unordered_map<String, IntegerVector> imap;
     unordered_map<String, NumericVector> wmap;
+    unordered_map<String, double> tmap;
     int i, t;
     for (i = 0; i < target_n; i++) {
       IntegerVector indices;
@@ -164,18 +166,20 @@ NumericVector process_distribute(const NumericMatrix &s, const IntegerVector &me
       const String id = tid[i];
       imap.insert({id, indices});
       wmap.insert({id, indices_weight});
+      tmap.insert({id, balance ? 0 : 1});
     }
     for (i = 0; i < source_n; i++) {
       weight_totals[i] = 0;
       const NumericVector tidws = map[i];
-      const CharacterVector tids = tidws.names();
       const int n = tidws.length();
       if (n) {
+        const CharacterVector tids = tidws.names();
         for (t = 0; t < n; t++) {
           const String id = tids[t];
           const double itw = tidws[t];
           imap.at(id).push_back(i);
           wmap.at(id).push_back(itw);
+          if (balance) tmap.at(id) += itw;
         }
       }
     }
@@ -183,12 +187,14 @@ NumericVector process_distribute(const NumericMatrix &s, const IntegerVector &me
       const String id = tid[i];
       const IntegerVector indices = imap.at(id);
       const NumericVector indices_weight = wmap.at(id);
+      const double weight_total = tmap.at(id);
       const int n = indices.length();
       bool any = false;
       start[i] = index.size();
       for (t = 0; t < n; t++) {
         const int si = indices[t];
-        const double wi = indices_weight[t];
+        double wi = indices_weight[t];
+        if (balance && weight_total != 1) wi /= weight_total;
         any = true;
         index.push_back(si);
         index_weight.push_back(wi);
@@ -204,8 +210,8 @@ NumericVector process_distribute(const NumericMatrix &s, const IntegerVector &me
     for (int i = 0, t; i < source_n; i++) {
       weight_totals[i] = 0;
       const NumericVector tidws = map[i];
-      const CharacterVector tids = tidws.names();
       if (tidws.length()) {
+        const CharacterVector tids = tidws.names();
         const IntegerVector indices = match(tids, tid) - 1;
         const int n = indices.length();
         bool any = false;

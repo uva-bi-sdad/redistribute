@@ -40,6 +40,8 @@
 #' entities that are mapped to multiple \code{source} entities to a single source entity. The value
 #' determines how entities with the same weight should be assigned, between \code{"first"} (default),
 #' \code{"last"}, and \code{"random"}.
+#' @param use_all Logical; if \code{TRUE} (default), will redistribute map weights so they sum to 1.
+#' Otherwise, entities may be partially weighted.
 #' @param return_geometry Logical; if \code{FALSE}, will not set the returned \code{data.frame}'s
 #' geometry to that of \code{target}, if it exists.
 #' @param return_map Logical; if \code{TRUE}, will only return the map, without performing the
@@ -64,7 +66,7 @@
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
 #' @importFrom utils write.csv
-#' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_crs<-
+#' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_crs<- st_geometry_type
 #' @importFrom s2 s2_area
 #' @useDynLib redistribute, .registration = TRUE
 #' @export
@@ -72,7 +74,7 @@
 redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID", target_id = source_id,
                          weight = NULL, source_variable = NULL, source_value = NULL, aggregate = NULL,
                          weight_agg_method = "auto", outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
-                         overlaps = "keep", return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
+                         overlaps = "keep", use_all = TRUE, return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
@@ -215,11 +217,13 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       if (verbose) cli_alert_info("map: all source IDs to a single target")
       intersect_map <- FALSE
       map <- as.list(structure(rep(tid, length(sid)), names = sid))
-    } else if (aggregate && !intersect_map && all(nchar(tid) == nchar(tid[1])) && nchar(sid[1]) > nchar(tid[1])) {
-      if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of source IDs")
+    } else if (aggregate && !intersect_map && all(nchar(tid) == nchar(tid[1])) &&
+      nchar(sid[1]) > nchar(tid[1]) && any(substring(sid, 1, nchar(tid[1])) %in% tid)) {
+      if (verbose) cli_alert_info("map: first {.field {nchar(tid[1])}} character{?s} of source IDs")
       intersect_map <- FALSE
       map <- as.list(structure(substr(sid, 1, nchar(tid[1])), names = sid))
-    } else if (!intersect_map && all(nchar(sid) == nchar(sid[1])) && nchar(tid[1]) > nchar(sid[1])) {
+    } else if (!intersect_map && all(nchar(sid) == nchar(sid[1])) && nchar(tid[1]) > nchar(sid[1]) &&
+      any(substring(tid, 1, nchar(sid[1])) %in% sid)) {
       if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of target IDs")
       map <- split(tid, substr(tid, 1, nchar(sid[1])))
     } else if (can_intersects && source_sf && target_sf) {
@@ -252,11 +256,11 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     source_geom <- st_geometry(source)
     names(source_geom) <- sid
   }
-  if (is.logical(overlaps) && overlaps) {
+  if ((is.logical(overlaps) && overlaps) || grepl("^[Kk]", overlaps)) {
     dodedupe <- FALSE
   } else {
-    tiebreak <- c(k = NULL, f = "first", l = "last", r = "random")[tolower(substring(overlaps, 1, 1))]
-    dodedupe <- is.null(tiebreak)
+    tiebreak <- c(f = "first", l = "last", r = "random")[tolower(substring(overlaps, 1, 1))]
+    dodedupe <- !is.na(tiebreak)
     deduper <- function(e, tm = tiebreak) {
       su <- which(e == max(e))
       if (length(su) > 1) {
@@ -270,37 +274,58 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     }
   }
   any_partial <- FALSE
-  map <- lapply(sid, function(id) {
-    e <- map[[id]]
-    if (length(e)) {
-      res <- if (is.null(names(e))) {
-        w <- if (intersect_map && length(e) != 1) {
-          reg <- st_geometry(target)[e]
-          part <- suppressMessages(st_intersection(reg, source_geom[id]))
-          s2_area(part) / s2_area(if (aggregate) source_geom[[id]] else reg)
+  map <- map[sid]
+  mls <- vapply(map, length, 0)
+  polys <- intersect_map && any(grepl("POLY", st_geometry_type(
+    if (aggregate) source_geom else st_geometry(target)
+  ), fixed = TRUE))
+  if (polys && any(mls > 1)) {
+    map <- lapply(sid, function(id) {
+      e <- map[[id]]
+      if (length(e)) {
+        res <- if (is.null(names(e))) {
+          w <- rep(1, length(e))
+          if (intersect_map && length(e) > 1) {
+            reg <- st_geometry(target)[e]
+            totals <- s2_area(reg)
+            su <- totals > 0
+            if (any(su)) {
+              part <- suppressMessages(st_intersection(reg[su], source_geom[id]))
+              w[su] <- s2_area(part) / (if (aggregate) s2_area(source_geom[[id]]) else totals[su])
+            }
+          }
+          names(w) <- if (is.integer(e)) tid[e] else e
+          w
         } else {
-          rep(1, length(e))
+          e
         }
+        if (dodedupe) {
+          deduper(res)
+        } else {
+          if (!aggregate && any(res < 1)) any_partial <<- TRUE
+          res
+        }
+      } else {
+        numeric()
+      }
+    })
+  } else {
+    map <- lapply(map, function(e) {
+      if (is.null(names(e))) {
+        w <- rep(1, length(e))
         names(w) <- if (is.integer(e)) tid[e] else e
-        w
-      } else {
-        e
+        e <- w
       }
-      if (dodedupe) {
-        deduper(res)
-      } else {
-        if (!aggregate && any(res != 1)) any_partial <<- TRUE
-        res
-      }
-    } else {
-      numeric()
-    }
-  })
+      if (!aggregate && any(e < 1)) any_partial <<- TRUE
+      e
+    })
+  }
   names(map) <- sid
   if (return_map) {
     if (verbose) cli_alert_info("returning map")
     return(map)
   }
+  mtid <- unlist(lapply(map, names), use.names = FALSE)
   nout <- length(if (aggregate) sid else tid)
   w <- if (length(weight) > 1) {
     if (verbose) cli_alert_info("weights: {.arg weight} vector")
@@ -308,36 +333,34 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       cli_abort("{.arg weight} is not the same length as {.arg {if (aggregate) 'source' else 'target'}} IDs")
     }
     weight
-  } else if ((aggregate && (is.null(weight) || !weight %in% colnames(source))) || length(dim(target)) != 2) {
-    weight <- if (!is.numeric(weight)) 1 else weight
-    if (verbose) cli_alert_info("weights: {.field {weight}}")
-    rep(weight, nout)
-  } else if (aggregate && !is.null(weight)) {
+  } else if (aggregate && !is.null(weight) && weight %in% colnames(source)) {
     if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg source}")
     w <- source[, weight, drop = TRUE]
     source <- source[, colnames(weight) != weight, drop = FALSE]
     w
+  } else if (!is.null(weight) && weight %in% colnames(target)) {
+    if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg target}")
+    target[, weight, drop = TRUE]
   } else {
-    if (!is.null(weight) && weight %in% colnames(target)) {
-      if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg target}")
-      target[, weight, drop = TRUE]
-    } else {
-      su <- vapply(seq_len(ncol(target)), function(col) is.numeric(target[, col, drop = TRUE]), TRUE)
-      if (any(su)) {
-        weight <- colnames(target)[which(su)[1]]
-        if (verbose) cli_alert_info("weights: {.field {weight}} column of {.arg target}")
-        target[, weight, drop = TRUE]
-      } else {
-        if (verbose) cli_alert_info("weights: {.field 1}")
-        rep(1, length(tid))
-      }
-    }
+    weight <- if (!is.numeric(weight)) 1 else weight
+    if (verbose) cli_alert_info("weights: {.field {weight}}")
+    rep(weight, nout)
   }
   w <- as.numeric(w)
   realign <- FALSE
-  if (!aggregate && anyDuplicated(tid)) {
+  if (!all(tid %in% mtid)) {
+    if (verbose) cli_alert_info("some {.arg target_id}s were dropped because they were not present in {.arg map}")
     realign <- TRUE
     otid <- tid
+    su <- tid %in% mtid
+    tid <- tid[su]
+    w <- w[su]
+  }
+  if (!aggregate && anyDuplicated(tid)) {
+    if (!realign) {
+      realign <- TRUE
+      otid <- tid
+    }
     agger <- if (weight_agg_method == "auto") {
       if (all(w == as.integer(w))) "summing" else "averaging"
     } else if (grepl("^[Ss]", weight_agg_method)) "summing" else "averaging"
@@ -379,7 +402,9 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     method <- method + 10
     if (any_partial) method[method == 11] <- 12
   }
-  res <- process_distribute(as.matrix(source), method, tid, w, map, aggregate)
+  res <- process_distribute(
+    as.matrix(source), method, tid, w, map, aggregate, any_partial && (!is.logical(use_all) || use_all)
+  )
   res <- as.data.frame(res)
   colnames(res) <- colnames(source)
   if (!all(source_numeric)) {

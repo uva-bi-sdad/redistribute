@@ -9,7 +9,7 @@ test_that("from data, with weights works", {
   target <- data.frame(id = 1:5, weight = c(1, 1, 2, 2, 5))
   w <- target$weight / sum(target$weight)
   expect_equal(
-    redistribute(source, target),
+    redistribute(source, target, weight = "weight"),
     data.frame(id = as.character(1:5), a = 1 * w, b = 2 * w, c = 3 * w)
   )
 })
@@ -17,7 +17,7 @@ test_that("from data, with weights works", {
 test_that("multiple source IDs, with categorical variables works", {
   source <- data.frame(id = c("a", "b"), cat = c("aaa", "bbb"), num = c(1, 2))
   target <- data.frame(id = sample(paste0(c("a", "b"), rep(1:5, 2))), population = sample.int(1e5, 10))
-  res <- redistribute(source, target)
+  res <- redistribute(source, target, weight = "population")
   map <- split(target$id, substr(target$id, 1, 1))
   mres <- do.call(rbind, lapply(names(map), function(l) {
     source_row <- source[source$id == l, ]
@@ -27,7 +27,7 @@ test_that("multiple source IDs, with categorical variables works", {
   rownames(mres) <- mres$id
   mres <- mres[target$id, ]
   rownames(mres) <- NULL
-  expect_equal(redistribute(source, target), mres)
+  expect_equal(redistribute(source, target, weight = "population"), mres)
 })
 
 test_that("tall works", {
@@ -38,13 +38,16 @@ test_that("tall works", {
     value = c(source$a, source$b)
   )
   target <- data.frame(id = paste0(rep(1:5, 6), 1:40), population = sample.int(1e5, 40))
-  expect_equal(redistribute(source_tall, target), redistribute(source, target))
+  expect_equal(
+    redistribute(source_tall, target, weight = "population"),
+    redistribute(source, target, weight = "population")
+  )
 })
 
 test_that("aggregation works", {
   source_original <- data.frame(id = c("a", "b"), cat = c("aaa", "bbb"), num = c(1, 2))
   target_original <- data.frame(id = sample(paste0(c("a", "b"), rep(1:5, 2))), population = sample.int(1e5, 10))
-  source <- redistribute(source_original, target_original)
+  source <- redistribute(source_original, target_original, weight = "population")
   expect_equal(redistribute(source, target = c("a", "b")), source_original)
 })
 
@@ -88,7 +91,9 @@ test_that("intersect map work", {
   }
   rownames(mres) <- NULL
   expect_identical(substring(capture.output(
-    res <- redistribute(source, target, source_id = "id", target_id = "id", map = map, verbose = TRUE),
+    res <- redistribute(
+      source, target, weight = "population", source_id = "id", target_id = "id", map = map, verbose = TRUE
+    ),
     type = "message"
   ), 3), c(
     "source IDs: id column of `source`",
@@ -99,7 +104,7 @@ test_that("intersect map work", {
     "(numb; 3) a, b, c"
   ))
   expect_equal(res[, 1:4, drop = TRUE], mres[, 1:4, drop = TRUE])
-  expect_identical(redistribute(source[, -1], target)[, -1], res[, -1])
+  expect_identical(redistribute(source[, -1], target, weight = "population")[, -1], res[, -1])
 
   ## aggregation
   map_weight <- c(1, .5)[grepl("^ab", target$id) + 1]
