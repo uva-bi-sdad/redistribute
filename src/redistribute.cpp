@@ -10,34 +10,43 @@ const int aggregate_mode(
     const int &os, const RMatrix<double> &source, const int &tstart, const int &tend,
     const vector<int> &source_rows, const vector<double> &iw
 ) {
+  bool any = false;
   double max = 0;
   int max_cat = 0;
   unordered_map<int, double> acc;
   for (int i = tstart, r; i < tend; i++) {
     r = source_rows[i];
     const int cat = source[r + os];
-    if (acc.find(cat) == acc.end()) {
-      acc.insert({cat, iw[i]});
-    } else acc.at(cat) += iw[i];
-    const double count = acc.at(cat);
-    if (count > max) {
-      max = count;
-      max_cat = cat;
+    if (isfinite(cat)) {
+      any = true;
+      if (acc.find(cat) == acc.end()) {
+        acc.insert({cat, iw[i]});
+      } else acc.at(cat) += iw[i];
+      const double count = acc.at(cat);
+      if (count > max) {
+        max = count;
+        max_cat = cat;
+      }
     }
   }
-  return max_cat;
+  return any ? max_cat : NA_INTEGER;
 }
 
 const double aggregate_sum(
     const int &os, const RMatrix<double> &source, const int &tstart, const int &tend,
     const vector<int> &source_rows, const RVector<double> &w, const vector<double> &iw
 ) {
+  bool any = false;
   double sum = 0;
   for (int i = tstart, r; i < tend; i++) {
     r = source_rows[i];
-    sum += source[r + os] * iw[i] * w[r];
+    const double v = source[r + os];
+    if (isfinite(v)) {
+      any = true;
+      sum += v * iw[i] * w[r];
+    }
   }
-  return sum;
+  return any ? sum : NA_REAL;
 }
 
 const double proportional_aggregate(
@@ -45,12 +54,17 @@ const double proportional_aggregate(
     const vector<int> &source_rows, const RVector<double> &w, const vector<double> &iw,
     const vector<double> &totals, const size_t &s
 ) {
+  bool any = false;
   double sum = 0;
   for (int i = tstart, r; i < tend; i++) {
     r = source_rows[i];
-    sum += source[r + os] * iw[i] * w[s] / totals[r];
+    const double v = source[r + os];
+    if (isfinite(v)) {
+      any = true;
+      sum += v * iw[i] * w[s] / totals[r];
+    }
   }
-  return sum;
+  return any ? sum : NA_REAL;
 }
 
 void proportional_categoric(
@@ -59,7 +73,7 @@ void proportional_categoric(
 ) {
   for (int i = tstart, r; i < tend; i++) {
     r = target_rows[i];
-    v[r + os] = s;
+    v[r + os] = isfinite(s) ? s : NA_REAL;
   }
 }
 
@@ -69,7 +83,7 @@ void proportional_numeric(
 ) {
   for (int i = tstart, r; i < tend; i++) {
     r = target_rows[i];
-    v[r + os] = s * iw[i] * w[r] / total;
+    v[r + os] = isfinite(s) ? s * iw[i] * w[r] / total : NA_REAL;
   }
 }
 

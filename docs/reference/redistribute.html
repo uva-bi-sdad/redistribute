@@ -58,8 +58,8 @@
 <span>  target_id <span class="op">=</span> <span class="va">source_id</span>, weight <span class="op">=</span> <span class="cn">NULL</span>, source_variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, aggregate <span class="op">=</span> <span class="cn">NULL</span>, weight_agg_method <span class="op">=</span> <span class="st">"auto"</span>,</span>
 <span>  outFile <span class="op">=</span> <span class="cn">NULL</span>, overwrite <span class="op">=</span> <span class="cn">FALSE</span>, make_intersect_map <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  overlaps <span class="op">=</span> <span class="st">"keep"</span>, return_geometry <span class="op">=</span> <span class="cn">TRUE</span>, return_map <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span>  overlaps <span class="op">=</span> <span class="st">"keep"</span>, use_all <span class="op">=</span> <span class="cn">TRUE</span>, return_geometry <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  return_map <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -138,6 +138,11 @@ determines how entities with the same weight should be assigned, between <code>"
 <code>"last"</code>, and <code>"random"</code>.</p></dd>
 
 
+<dt>use_all</dt>
+<dd><p>Logical; if <code>TRUE</code> (default), will redistribute map weights so they sum to 1.
+Otherwise, entities may be partially weighted.</p></dd>
+
+
 <dt>return_geometry</dt>
 <dd><p>Logical; if <code>FALSE</code>, will not set the returned <code>data.frame</code>'s
 geometry to that of <code>target</code>, if it exists.</p></dd>
@@ -189,22 +194,22 @@ redistribution. Useful if you want to inspect an automatically created map, or u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> source IDs: <span style="color: #00BB00;">id</span> column of `source`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target IDs: <span style="color: #00BB00;">id</span> column of `target`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: first <span style="color: #00BB00;">1</span> character of target IDs</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">population</span> column of `target`</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 1) num</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char; 1) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    id cat        num</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b3 bbb 0.45249817</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a3 aaa 0.17858705</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  b5 bbb 0.14553715</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b2 bbb 0.57044228</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a5 aaa 0.01643439</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a2 aaa 0.30489966</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b4 bbb 0.47239257</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a4 aaa 0.15564202</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b1 bbb 0.35912983</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a1 aaa 0.34443688</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    id cat num</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b1 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a3 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  a1 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  a4 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  b2 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a5 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b5 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  b4 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b3 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a2 aaa 0.2</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

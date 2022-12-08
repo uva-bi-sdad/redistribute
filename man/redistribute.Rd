@@ -8,8 +8,8 @@ redistribute(source, target = NULL, map = list(), source_id = "GEOID",
   target_id = source_id, weight = NULL, source_variable = NULL,
   source_value = NULL, aggregate = NULL, weight_agg_method = "auto",
   outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
-  overlaps = "keep", return_geometry = TRUE, return_map = FALSE,
-  verbose = FALSE)
+  overlaps = "keep", use_all = TRUE, return_geometry = TRUE,
+  return_map = FALSE, verbose = FALSE)
 }
 \arguments{
 \item{source}{A matrix-like object you want to distribute from; usually this will be
@@ -61,6 +61,9 @@ never calculate an intersect-based map.}
 entities that are mapped to multiple \code{source} entities to a single source entity. The value
 determines how entities with the same weight should be assigned, between \code{"first"} (default),
 \code{"last"}, and \code{"random"}.}
+
+\item{use_all}{Logical; if \code{TRUE} (default), will redistribute map weights so they sum to 1.
+Otherwise, entities may be partially weighted.}
 
 \item{return_geometry}{Logical; if \code{FALSE}, will not set the returned \code{data.frame}'s
 geometry to that of \code{target}, if it exists.}

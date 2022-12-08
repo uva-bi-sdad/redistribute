@@ -348,13 +348,13 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   }
   w <- as.numeric(w)
   realign <- FALSE
-  if (!all(tid %in% mtid)) {
+  su <- tid %in% mtid
+  if (!all(su)) {
     if (verbose) cli_alert_info("some {.arg target_id}s were dropped because they were not present in {.arg map}")
     realign <- TRUE
     otid <- tid
-    su <- tid %in% mtid
     tid <- tid[su]
-    w <- w[su]
+    if (!aggregate) w <- w[su]
   }
   if (!aggregate && anyDuplicated(tid)) {
     if (!realign) {
@@ -402,9 +402,8 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     method <- method + 10
     if (any_partial) method[method == 11] <- 12
   }
-  res <- process_distribute(
-    as.matrix(source), method, tid, w, map, aggregate, any_partial && (!is.logical(use_all) || use_all)
-  )
+  balance <- any_partial && (!is.logical(use_all) || use_all)
+  res <- process_distribute(as.matrix(source), method, tid, w, map, aggregate, balance)
   res <- as.data.frame(res)
   colnames(res) <- colnames(source)
   if (!all(source_numeric)) {
@@ -417,9 +416,10 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   }
   res <- cbind(id = tid, res)
   if (realign) {
-    if (verbose) cli_alert_info("realigning with duplicated target IDs")
+    if (verbose) cli_alert_info("realigning with original target IDs")
     rownames(res) <- tid
     res <- res[otid, ]
+    res$id <- otid
     rownames(res) <- NULL
   }
   if (!is.null(outFile)) {

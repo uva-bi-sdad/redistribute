@@ -92,7 +92,8 @@ test_that("intersect map work", {
   rownames(mres) <- NULL
   expect_identical(substring(capture.output(
     res <- redistribute(
-      source, target, weight = "population", source_id = "id", target_id = "id", map = map, verbose = TRUE
+      source, target,
+      weight = "population", source_id = "id", target_id = "id", map = map, verbose = TRUE
     ),
     type = "message"
   ), 3), c(

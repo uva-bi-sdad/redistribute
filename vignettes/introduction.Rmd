@@ -62,7 +62,8 @@ Or, maybe we know a little more about the regions, such as their size; then we c
 information to adjust the proportion allotted to each region:
 ```{r}
 region_values <- redistribute(
-  set_value, regions, weight = c(1, 10, 10, 20, 50), verbose = TRUE
+  set_value, regions,
+  weight = c(1, 10, 10, 20, 50), verbose = TRUE
 )
 region_values
 ```
@@ -87,7 +88,9 @@ library(sf)
 # download population and data shapes
 population <- download_census_population("~/Downloads", "VA", 2020)$estimates
 population <- population[grepl("^51(?:059|600)", population$GEOID), ]
-population[, -1] <- vapply(population[, -1], as.numeric, numeric(nrow(population)))
+population[, -1] <- vapply(
+  population[, -1], as.numeric, numeric(nrow(population))
+)
 rownames(population) <- population$GEOID
 block_groups <- st_transform(
   download_census_shapes("~/Downloads", "VA", "bg", year = 2020), "WGS84"
@@ -100,23 +103,30 @@ population$Overall <- population$TOTAL.POPULATION_Total
 # prepare a map
 library(leaflet)
 pal <- colorNumeric(scico::scico(255, palette = "lajolla"), population$Overall)
-map <- leaflet(population, options = leafletOptions(attributionControl = FALSE)) |>
+map <- leaflet(
+  population,
+  options = leafletOptions(attributionControl = FALSE)
+) |>
   addProviderTiles("CartoDB.Positron") |>
   addScaleBar("bottomleft") |>
   addControl("Total Population", "topright") |>
   addLayersControl(
-    position = "topleft", overlayGroups = c(
-      "Block Groups", "Block Group -> Zip Codes", "Parcels -> Zip Codes"
+    position = "topleft", overlayGroups = "Block Groups",
+    baseGroups = c(
+      "Zip Codes", "Parcels -> Zip Codes", "Block Groups -> Zip Codes",
+      "Block Groups -> Parcels -> Zip Codes"
     )
   ) |>
   addLegend(
     "bottomright", pal, ~Overall,
-    title = "Block Groups", group = "Block Groups", opacity = 1
+    title = "Block Groups", opacity = 1
   ) |>
   addPolygons(
     fillColor = ~ pal(Overall), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Block Groups", label = ~ paste(GEOID, "Population:", round(Overall, 3))
+    group = "Block Groups", label = ~ paste(
+      GEOID, "Population:", round(Overall, 3)
+    )
   )
 ```
 
@@ -130,16 +140,18 @@ involves calculating proportional intersections between region polygons:
 zipcode_file <- "~/Downloads/zipcode_va_fairfax.geojson"
 if (!file.exists(zipcode_file)) {
   download.file(paste0(
-    "https://www.fairfaxcounty.gov/euclid/rest/services/IPLS/IPLSMap/MapServer/3/query?",
-    'geometry={"xmin":-90,"ymin":-90,"xmax":90,"ymax":90,"spatialReference":{"wkid":4326}}',
-    "&outFields=*&f=geojson"
+    "https://www.fairfaxcounty.gov/euclid/rest/services/",
+    "IPLS/IPLSMap/MapServer/3/query?",
+    'geometry={"xmin":-90,"ymin":-90,"xmax":90,"ymax":90,',
+    '"spatialReference":{"wkid":4326}}&outFields=*&f=geojson'
   ), zipcode_file)
 }
 zipcodes <- read_sf(zipcode_file)
 
 # redistribute population data from block groups
 zipcode_population <- redistribute(
-  population, zipcodes, target_id = "ZIPCODE", verbose = TRUE
+  population, zipcodes,
+  target_id = "ZIPCODE", verbose = TRUE
 )
 ```
 
@@ -150,43 +162,77 @@ We could also disaggregate to the parcel level, which are point locations, then 
 parcel_file <- "~/Downloads/parcel_va_fairfax.geojson"
 if (!file.exists(parcel_file)) {
   download.file(paste0(
-    "https://opendata.arcgis.com/api/v3/datasets/314bfe4019754952a715be3a33384d9d_0/",
+    "https://opendata.arcgis.com/api/v3/datasets/",
+    "314bfe4019754952a715be3a33384d9d_0/",
     "downloads/data?format=geojson&spatialRefId=4326&where=1=1"
   ), parcel_file)
 }
 parcels <- read_sf(parcel_file)
 
-# redistribute population data from block groups
-parcel_population <- redistribute(population, parcels, weight = "CURRE_POPUL", verbose = TRUE)
+# disaggregate population data from block groups to parcels
+bg_parcel_population <- redistribute(
+  population, parcels,
+  weight = "CURRE_POPUL", verbose = TRUE
+)
+
+# then aggregate from parcels to zip codes
+bg_parcel_zipcode_population <- redistribute(
+  bg_parcel_population, zipcodes,
+  source_id = "id", target_id = "ZIPCODE", verbose = TRUE
+)
+
+# since it's provided in this case, we can also just aggregate
+# up from parcels directly
 parcel_zipcode_population <- redistribute(
-  parcel_population, zipcodes, source_id = "id", target_id = "ZIPCODE", verbose = TRUE
+  parcels, zipcodes,
+  source_id = "PIN", target_id = "ZIPCODE", verbose = TRUE
 )
 ```
 
+Now we can compare the estimated total population of these different methods
+with those provided:
 ```{r}
-pal_bg <- colorNumeric(scico::scico(255, palette = "lajolla"), zipcode_population$Overall)
-pal_pa <- colorNumeric(scico::scico(255, palette = "lajolla"), parcel_zipcode_population$Overall)
+all_values <- c(
+  zipcodes$POPULATION, zipcode_population$Overall,
+  bg_parcel_zipcode_population$Overall, parcel_zipcode_population$CURRE_POPUL
+)
+pal_zip <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
 map |>
+  addPolygons(
+    data = zipcodes,
+    fillColor = ~ pal_zip(POPULATION), fillOpacity = .8, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Zip Codes", label = ~ paste(
+      ZIPCODE, "Population:", round(POPULATION, 3)
+    )
+  ) |>
+  hideGroup("Zip Codes") |>
+  addPolygons(
+    data = parcel_zipcode_population,
+    fillColor = ~ pal_zip(CURRE_POPUL), fillOpacity = .8, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Parcels -> Zip Codes", label = ~ paste(
+      id, "Population:", round(CURRE_POPUL, 3)
+    )
+  ) |>
+  hideGroup("Parcels -> Zip Codes") |>
   addPolygons(
     data = zipcode_population,
     fillColor = ~ pal_zip(Overall), fillOpacity = .8, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Block Group -> Zip Codes", label = ~ paste(
+    group = "Block Groups -> Zip Codes", label = ~ paste(
       id, "Population:", round(Overall, 3)
     )
   ) |>
-  addLegend(
-    "bottomright", pal_zip, zipcode_population$Overall,
-    opacity = 1, title = "Block Group -> Zip Codes", group = "Block Group -> Zip Codes"
-  ) |>
+  hideGroup("Block Groups -> Zip Codes") |>
   addPolygons(
-    data = zipcode_population,
+    data = bg_parcel_zipcode_population,
     fillColor = ~ pal_zip(Overall), fillOpacity = .8, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Parcels -> Zip Codes", label = ~ paste(id, "Population:", round(Overall, 3))
+    group = "Block Groups -> Parcels -> Zip Codes", label = ~ paste(
+      id, "Population:", round(Overall, 3)
+    )
   ) |>
-  addLegend(
-    "bottomright", pal_zip, zipcode_population$Overall,
-    opacity = 1, title = "Parcels -> Zip Codes", group = "Parcels -> Zip Codes"
-  )
+  showGroup("Block Groups -> Parcels -> Zip Codes") |>
+  addLegend("bottomright", pal_zip, all_values, opacity = 1, title = "Zip Codes")
 ```
