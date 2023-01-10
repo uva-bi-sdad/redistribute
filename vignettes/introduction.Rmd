@@ -140,10 +140,8 @@ involves calculating proportional intersections between region polygons:
 zipcode_file <- "~/Downloads/zipcode_va_fairfax.geojson"
 if (!file.exists(zipcode_file)) {
   download.file(paste0(
-    "https://www.fairfaxcounty.gov/euclid/rest/services/",
-    "IPLS/IPLSMap/MapServer/3/query?",
-    'geometry={"xmin":-90,"ymin":-90,"xmax":90,"ymax":90,',
-    '"spatialReference":{"wkid":4326}}&outFields=*&f=geojson'
+    "https://www.fairfaxcounty.gov/euclid/rest/services/IPLS/IPLSMap",
+    "/MapServer/3/query?where=1=1&outFields=*&outSR=4326&f=geojson"
   ), zipcode_file)
 }
 zipcodes <- read_sf(zipcode_file)
@@ -163,8 +161,8 @@ parcel_file <- "~/Downloads/parcel_va_fairfax.geojson"
 if (!file.exists(parcel_file)) {
   download.file(paste0(
     "https://opendata.arcgis.com/api/v3/datasets/",
-    "314bfe4019754952a715be3a33384d9d_0/",
-    "downloads/data?format=geojson&spatialRefId=4326&where=1=1"
+    "314bfe4019754952a715be3a33384d9d_0/downloads/data",
+    "?format=geojson&spatialRefId=4326&where=1=1"
   ), parcel_file)
 }
 parcels <- read_sf(parcel_file)

@@ -62,19 +62,26 @@
 #' (redistribute(source, target, verbose = TRUE))
 #' @returns A \code{data.frame} with a row for each \code{target_ids} (identified by the first column,
 #' \code{id}), and a column for each variable from \code{source}.
-#' @importFrom cli cli_abort cli_bullets cli_alert_info
+#' @importFrom cli cli_abort cli_bullets cli_alert_info cli_alert_warning cli_warn
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
-#' @importFrom utils write.csv
+#' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_crs<- st_geometry_type
+#' st_coordinates st_centroid
 #' @importFrom s2 s2_area
+#' @importFrom lingmatch lma_simets
+#' @importFrom jsonlite read_json write_json
+#' @importFrom curl curl_fetch_disk
+#' @importFrom vroom vroom vroom_write
+#' @importFrom stats rbeta rbinom rnorm rpois
 #' @useDynLib redistribute, .registration = TRUE
 #' @export
 
-redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID", target_id = source_id,
-                         weight = NULL, source_variable = NULL, source_value = NULL, aggregate = NULL,
-                         weight_agg_method = "auto", outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
-                         overlaps = "keep", use_all = TRUE, return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
+redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID",
+                         target_id = source_id, weight = NULL, source_variable = NULL, source_value = NULL,
+                         aggregate = NULL, weight_agg_method = "auto", outFile = NULL, overwrite = FALSE,
+                         make_intersect_map = FALSE, overlaps = "keep", use_all = TRUE, return_geometry = TRUE,
+                         return_map = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
@@ -426,7 +433,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     if (verbose) cli_alert_info("writing results to {.file {outFile}}")
     dir.create(dirname(outFile), FALSE, TRUE)
     if (!grepl("\\.\\w", outFile)) outFile <- paste0(outFile, ".csv")
-    write.csv(res, outFile, row.names = FALSE)
+    vroom_write(res, outFile, ",")
   }
   if (return_geometry && target_sf) st_geometry(res) <- st_geometry(target)
   invisible(res)

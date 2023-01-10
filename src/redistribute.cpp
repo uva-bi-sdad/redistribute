@@ -61,7 +61,7 @@ const double proportional_aggregate(
     const double v = source[r + os];
     if (isfinite(v)) {
       any = true;
-      sum += v * iw[i] * w[s] / totals[r];
+      if (totals[r]) sum += v * iw[i] * w[s] / totals[r];
     }
   }
   return any ? sum : NA_REAL;
@@ -71,9 +71,10 @@ void proportional_categoric(
     const int &os, const int &s, const int &tstart, const int &tend, const vector<int> &target_rows,
     RVector<double> &v, const vector<double> &iw
 ) {
+  const int val = isfinite(s) ? s : NA_REAL;
   for (int i = tstart, r; i < tend; i++) {
     r = target_rows[i];
-    v[r + os] = isfinite(s) ? s : NA_REAL;
+    v[r + os] = val;
   }
 }
 

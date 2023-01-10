@@ -10,6 +10,24 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// generate_individuals
+NumericVector generate_individuals(const IntegerVector& region, const IntegerVector& head_income, const IntegerVector& size, const IntegerVector& renting, const NumericMatrix& space, const int& n_neighbors, const double& range, const NumericVector& race_rates);
+RcppExport SEXP _redistribute_generate_individuals(SEXP regionSEXP, SEXP head_incomeSEXP, SEXP sizeSEXP, SEXP rentingSEXP, SEXP spaceSEXP, SEXP n_neighborsSEXP, SEXP rangeSEXP, SEXP race_ratesSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const IntegerVector& >::type region(regionSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type head_income(head_incomeSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type size(sizeSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type renting(rentingSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type space(spaceSEXP);
+    Rcpp::traits::input_parameter< const int& >::type n_neighbors(n_neighborsSEXP);
+    Rcpp::traits::input_parameter< const double& >::type range(rangeSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type race_rates(race_ratesSEXP);
+    rcpp_result_gen = Rcpp::wrap(generate_individuals(region, head_income, size, renting, space, n_neighbors, range, race_rates));
+    return rcpp_result_gen;
+END_RCPP
+}
 // process_distribute
 NumericVector process_distribute(const NumericMatrix& s, const IntegerVector& method, const CharacterVector& tid, const NumericVector& weight, const List& map, const bool& agg, const bool& balance);
 RcppExport SEXP _redistribute_process_distribute(SEXP sSEXP, SEXP methodSEXP, SEXP tidSEXP, SEXP weightSEXP, SEXP mapSEXP, SEXP aggSEXP, SEXP balanceSEXP) {
@@ -29,6 +47,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_redistribute_generate_individuals", (DL_FUNC) &_redistribute_generate_individuals, 8},
     {"_redistribute_process_distribute", (DL_FUNC) &_redistribute_process_distribute, 7},
     {NULL, NULL, 0}
 };
