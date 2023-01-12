@@ -74,6 +74,7 @@
 #' @importFrom curl curl_fetch_disk
 #' @importFrom vroom vroom vroom_write
 #' @importFrom stats rbeta rbinom rnorm rpois
+#' @importFrom Matrix Matrix drop0
 #' @useDynLib redistribute, .registration = TRUE
 #' @export
 

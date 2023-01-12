@@ -26,8 +26,8 @@ test_that("IDs and regions are as requested", {
   n_households <- 1e4
   regions <- seq_len(n_households)
   pop <- generate_population(n_households)
-  expect_identical(pop$households$household, seq_len(n_households))
-  expect_true(all(pop$households$region %in% seq_len(n_households)))
+  expect_identical(pop$households$household, regions)
+  expect_true(all(pop$households$region %in% regions))
   expect_identical(
     as.integer(pop$individuals$household),
     rep(pop$households$household, pop$households$size)

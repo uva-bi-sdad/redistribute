@@ -3,6 +3,8 @@
 export(download_census_pums)
 export(generate_population)
 export(redistribute)
+importFrom(Matrix,Matrix)
+importFrom(Matrix,drop0)
 importFrom(Rcpp,sourceCpp)
 importFrom(RcppParallel,RcppParallelLibs)
 importFrom(cli,cli_abort)

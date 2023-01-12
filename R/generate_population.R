@@ -98,7 +98,7 @@
 generate_population <- function(N = 1000, regions = NULL, capacities = NULL, attraction_loci = 2,
                                 random_regions = .1, cost_loci = 2, size_loci = 2,
                                 similarity_metric = "euclidean", n_neighbors = 50,
-                                neighbor_range = .1, n_races = 6, verbose = FALSE) {
+                                neighbor_range = .5, n_races = 6, verbose = FALSE) {
   if (inherits(regions, "sf")) regions <- st_coordinates(st_centroid(regions))
   gen_regions <- missing(regions)
   gen_capacities <- missing(capacities)
@@ -155,7 +155,10 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
       }
       regions
     }
-    regions <- as.data.frame(matrix(rnorm(length(rids) * 2), ncol = 2, dimnames = list(rids, c("X", "Y"))))
+    regions <- matrix(
+      ceiling(rnorm(length(rids) * 2, 1e5, 1e4)),
+      ncol = 2, dimnames = list(rids, c("X", "Y"))
+    )
   }
   nr <- length(rids)
   capacities <- rep_len(if (!is.numeric(capacities)) N / nr else capacities, nr)
@@ -180,17 +183,19 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
   selected_attraction_loci <- sample.int(nr, attraction_loci)
   if (verbose) cli_alert_info("calculating region similarities")
   if (nr == 1) {
-    space <- matrix(100, 1, 2, dimnames = list(rids, c("X", "Y")))
+    space <- Matrix(1, dimnames = list(rids, rids), sparse = TRUE)
   } else {
     space <- lma_simets(regions, metric = similarity_metric, symmetrical = TRUE)
-    space <- as.matrix(space)
   }
   if (verbose) cli_alert_info("rescaling region similarities")
-  min_space <- min(space)
-  space <- (space - min_space) / (max(space) - min_space)
+  min_space <- min(space@x)
+  space@x <- (space@x - min_space) / (max(space@x) - min_space)
+  space_cols <- integer(ncol(space))
 
   # select initial locations
-  ro <- order(-rowSums(space[, selected_attraction_loci, drop = FALSE]))
+  space_cols[selected_attraction_loci] <- -1L
+  ro <- order(space %*% space_cols)
+  space_cols[selected_attraction_loci] <- 0L
   rids_expanded <- rep(ro, capacities[ro])
   region <- rids_expanded[household]
 
@@ -214,7 +219,9 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
     cli_alert_info("cost loci: {.field {cost_loci}}")
   }
   selected_cost_loci <- sample.int(nr, cost_loci)
-  region_cost <- rnorm(nr, rowMeans(space[, selected_cost_loci, drop = FALSE]) * 3e5, 3e4)
+  space_cols[selected_cost_loci] <- 1L
+  region_cost <- rnorm(nr, (as.numeric(space %*% space_cols) / nr) * 3e5, 3e4)
+  space_cols[selected_cost_loci] <- 0L
   head_income <- abs(as.integer(
     rnorm(N, region_cost[region], 2e3) + (rbeta(N, .1, 1) - .6) * region_cost[region]
   ))
@@ -229,7 +236,9 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
   } else if (verbose) {
     cli_alert_info("size loci: {.field {size_loci}}")
   }
-  size_prob <- rowMeans(space[region, sample.int(nr, size_loci), drop = FALSE]) +
+  selected_size_loci <- sample.int(nr, size_loci)
+  space_cols[selected_size_loci] <- 1L
+  size_prob <- ((space %*% space_cols) / nr)[region, ] +
     rbeta(N, head_income / max(head_income), 1)
   size <- rpois(N, 1 + size_prob * (max(size_prob) - size_prob) / 1) + 1L
 
@@ -244,8 +253,10 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
 
   # preparing individual data
   if (verbose) cli_alert_info("generating individuals")
+  space@x[space@x < neighbor_range] <- 0
+  space <- drop0(space)
   individuals <- generate_individuals(
-    region, head_income, size, renting, space, n_neighbors, neighbor_range, race_rates
+    region, head_income, size, renting, space, n_neighbors, race_rates
   )
 
   list(

@@ -7,7 +7,7 @@
 generate_population(N = 1000, regions = NULL, capacities = NULL,
   attraction_loci = 2, random_regions = 0.1, cost_loci = 2,
   size_loci = 2, similarity_metric = "euclidean", n_neighbors = 50,
-  neighbor_range = 0.1, n_races = 6, verbose = FALSE)
+  neighbor_range = 0.5, n_races = 6, verbose = FALSE)
 }
 \arguments{
 \item{N}{Number of initial individuals to generate. Final number of individuals will be larger.}

@@ -22,48 +22,54 @@ const int select(const vector<int> &local, const NumericVector &base) {
 struct Generate : public Worker {
   RVector<double> individuals;
   const vector<int> start, end;
-  const IntegerVector region, head_income, size, renting;
-  const NumericMatrix space;
-  const NumericVector race_rates;
-  const int N, n_neighbors, n_races = race_rates.length(), n_regions = space.rows(),
-    nh = region.length();
-  const double range;
+  const IntegerVector region, head_income, size, renting, space_i, space_p;
+  const NumericVector space_x, race_rates;
+  const int N, n_neighbors, n_races = race_rates.length(), nh = region.length();
   Generate(
     NumericVector &individuals, const vector<int> &start, const vector<int> &end,
-    const IntegerVector &region, const IntegerVector &head_income,
-    const IntegerVector &size, const IntegerVector &renting, const NumericMatrix &space,
-    const NumericVector &race_rates, const int &N, const double &n_neighbors, const double &range
+    const IntegerVector &region, const IntegerVector &head_income, const IntegerVector &size,
+    const IntegerVector &renting, const S4 &space, const NumericVector &race_rates,
+    const int &N, const double &n_neighbors
   ):
     individuals(individuals), start(start), end(end), region(region),
-    head_income(head_income), size(size), renting(renting), space(space),
-    race_rates(race_rates), N(N), n_neighbors(n_neighbors), range(range)
+    head_income(head_income), size(size), renting(renting), space_i(space.slot("i")),
+    space_p(space.slot("p")), space_x(space.slot("x")), race_rates(race_rates), N(N),
+    n_neighbors(n_neighbors)
   {}
   void operator()(size_t s, size_t e){
     int ck = 1e3;
     vector<int> neighbors(n_neighbors), race_table(n_races);
     for (; s < e; s++) {
-      const int ci = s, r = region[s], inc = head_income[s], n = size[s],
+      const int ci = s, r = region[s] - 1, inc = head_income[s], n = size[s],
         ro = renting[s], ie = end[s];
-      int i = 0, nn = 0, nni, nhi, nhn, h1, h2;
+      int i = 0, nn = 0, nni, nhi = space_p[r], nhn = space_p[r + 1], h1, h2;
+      double ns = 0;
 
       // summarize neighbors
-      const NumericMatrix::ConstRow sim = space(r - 1, _);
       vector<int> neighbor_index;
       vector<double> neighbor_sims;
       // // find neighbors in range
       for (; i < nh; i++) {
         if (i != ci) {
-          const int ns = sim[region[i] - 1];
-          if (ns > range && individuals[start[i]]) {
+          const int nr = region[i] - 1;
+          ns = 0;
+          for (nni = nhi; nni < nhn; nni++) {
+            if (space_i[nni] == nr) {
+              ns = space_x[nni];
+              break;
+            }
+          }
+          if (ns) {
             if (nn < n_neighbors) {
               neighbor_index.push_back(i);
               neighbor_sims.push_back(ns);
               nn++;
             } else {
-              for (int ni = nn; ni--;) {
-                if (ns > neighbor_sims[ni]) {
-                  neighbor_index[ni] = i;
-                  neighbor_sims[ni] = ns;
+              ns += R::rnorm(0, 1e-5);
+              for (nni = nn; nni--;) {
+                if (ns > neighbor_sims[nni]) {
+                  neighbor_index[nni] = i;
+                  neighbor_sims[nni] = ns;
                   break;
                 }
               }
@@ -81,7 +87,7 @@ struct Generate : public Worker {
           if (individuals[nhi]) {
             for (; nhi < nhn; nhi++) {
               neighbors[0] += individuals[nhi + 3 * N]; // sum age
-              neighbors[1] += !individuals[nhi + 4 * N]; // n 0 sex
+              neighbors[1] += individuals[nhi + 4 * N]; // n 1 sex
               race_table[individuals[nhi + 5 * N]]++;
               neighbors[3] += individuals[nhi + 6 * N]; // sum income
               nn++;
@@ -160,9 +166,9 @@ struct Generate : public Worker {
 
 // [[Rcpp::export]]
 NumericVector generate_individuals(
-    const IntegerVector &region, const IntegerVector &head_income,
-    const IntegerVector &size, const IntegerVector &renting, const NumericMatrix &space,
-    const int &n_neighbors, const double &range, const NumericVector &race_rates
+    const IntegerVector &region, const IntegerVector &head_income, const IntegerVector &size,
+    const IntegerVector &renting, const S4 &space, const int &n_neighbors,
+    const NumericVector &race_rates
   ) {
   const int nh = size.length(), nvars = 7;
 
@@ -177,8 +183,7 @@ NumericVector generate_individuals(
 
   NumericVector individuals(n * nvars);
   Generate g(
-    individuals, start, end, region, head_income, size, renting,
-    space, race_rates, n, n_neighbors, range
+    individuals, start, end, region, head_income, size, renting, space, race_rates, n, n_neighbors
   );
   parallelFor(0, nh, g);
 
