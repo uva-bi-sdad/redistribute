@@ -63,11 +63,12 @@
 #' @returns A \code{data.frame} with a row for each \code{target_ids} (identified by the first column,
 #' \code{id}), and a column for each variable from \code{source}.
 #' @importFrom cli cli_abort cli_bullets cli_alert_info cli_alert_warning cli_warn
+#' cli_progress_step cli_progress_update cli_progress_done
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_crs<- st_geometry_type
-#' st_coordinates st_centroid
+#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union
 #' @importFrom s2 s2_area
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json

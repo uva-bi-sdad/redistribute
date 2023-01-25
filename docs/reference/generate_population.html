@@ -60,7 +60,7 @@ demographic and location features.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">generate_population</span><span class="op">(</span>N <span class="op">=</span> <span class="fl">1000</span>, regions <span class="op">=</span> <span class="cn">NULL</span>, capacities <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  attraction_loci <span class="op">=</span> <span class="fl">2</span>, random_regions <span class="op">=</span> <span class="fl">0.1</span>, cost_loci <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  size_loci <span class="op">=</span> <span class="fl">2</span>, similarity_metric <span class="op">=</span> <span class="st">"euclidean"</span>, n_neighbors <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  neighbor_range <span class="op">=</span> <span class="fl">0.1</span>, n_races <span class="op">=</span> <span class="fl">6</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span>  neighbor_range <span class="op">=</span> <span class="fl">0.5</span>, n_races <span class="op">=</span> <span class="fl">6</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -180,24 +180,24 @@ has a 10% chance to be the same as the first member's, and 90% chance to be oppo
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $params$range</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.5</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $params$races_rates</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.36811639 0.50000000 0.25097461 0.02376659 0.28829529 0.20463744</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.41358937 0.36535475 0.50000000 0.24103217 0.23342555 0.05558758</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $households</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   household region head_income size renting</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1         1      1       47543    3       1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2         2      2       60974    2       0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1         1      1      123404    2       0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2         2      2       55781    3       1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $individuals</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   household person neighbors age sex race income</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1         1      1         0  56   0    0  47543</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2         1      2         0  42   1    1      0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3         1      3         0  34   0    0      0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4         2      4         0  84   0    1  60974</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5         2      5         0  69   0    0  69118</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1         1      1         0  32   0    2 123404</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2         1      2         0  32   1    1 152433</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3         2      3         0  53   0    1  55781</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4         2      4         0  38   1    1      0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5         2      5         0   4   0    1      0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 </code></pre></div>
     </div>

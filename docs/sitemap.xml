@@ -34,6 +34,9 @@
     <loc>/reference/index.html</loc>
   </url>
   <url>
+    <loc>/reference/make_parent_polygons.html</loc>
+  </url>
+  <url>
     <loc>/reference/redistribute.html</loc>
   </url>
 </urlset>
