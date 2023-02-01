@@ -5,7 +5,9 @@
 #' @param source A matrix-like object you want to distribute from; usually this will be
 #' the real or more complete dataset, and is often at a lower resolution / higher level.
 #' @param target A matrix-like object you want to distribute to: usually this will be
-#' the dataset you want but isn't available, and is often at a higher resolution / lower level.
+#' the dataset you want but isn't available, and is often at a higher resolution / lower level
+#' (for disaggregation). Can also be a single number, representing the number of initial
+#' characters of \code{source} IDs to derive target IDs from (useful for aggregating up nested groups).
 #' @param map A list with entries named with \code{source} IDs (or aligning with those IDs),
 #' containing vectors of associated \code{target} IDs (or indices of those IDs). Entries
 #' can also be numeric vectors with IDs as names, which will be used to weigh the relationship.
@@ -67,8 +69,8 @@
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
 #' @importFrom utils unzip
-#' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_crs<- st_geometry_type
-#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union
+#' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
+#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform
 #' @importFrom s2 s2_area
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
@@ -157,7 +159,10 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     sid <- usid
   }
   if (length(dim(target)) == 2 && is.null(colnames(target))) colnames(target) <- paste0("V", seq_len(ncol(target)))
-  if (length(target_id) > 1) {
+  if (length(target) == 1 && is.numeric(target)) {
+    if (verbose) cli_alert_info("target IDs: first {.field {target}} characters of {.arg source} IDs")
+    tid <- target <- unique(substring(sid, 1, target))
+  } else if (length(target_id) > 1) {
     if (verbose) cli_alert_info("target IDs: {.arg target_id} vector")
     tid <- target_id
   } else if (is.null(target)) {
@@ -240,7 +245,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       intersect_map <- TRUE
       op <- options(sf_use_s2 = FALSE)
       on.exit(options(sf_use_s2 = op[[1]]))
-      if (st_crs(source) != st_crs(target)) st_crs(target) <- st_crs(source)
+      if (st_crs(source) != st_crs(target)) target <- st_transform(target, st_crs(source))
       map <- tryCatch(suppressMessages(st_intersects(st_geometry(source), st_geometry(target))), error = function(e) NULL)
       if (is.null(map)) {
         cli_abort(c(
@@ -250,7 +255,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       }
       names(map) <- sid
     } else {
-      cli_abort("no map was provided, and could not make one from IDs")
+      cli_abort("no map was provided, and it could not be made from IDs")
     }
   }
   if (aggregate && length(map) == length(tid) && length(map) != length(sid)) {
@@ -261,7 +266,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     names(map) <- rep(ids, child_counts)
   }
   if (intersect_map) {
-    if (st_crs(source) != st_crs(target)) st_crs(target) <- st_crs(source)
+    if (st_crs(source) != st_crs(target)) target <- st_transform(target, st_crs(source))
     source_geom <- st_geometry(source)
     names(source_geom) <- sid
   }

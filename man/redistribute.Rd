@@ -16,7 +16,9 @@ redistribute(source, target = NULL, map = list(), source_id = "GEOID",
 the real or more complete dataset, and is often at a lower resolution / higher level.}
 
 \item{target}{A matrix-like object you want to distribute to: usually this will be
-the dataset you want but isn't available, and is often at a higher resolution / lower level.}
+the dataset you want but isn't available, and is often at a higher resolution / lower level
+(for disaggregation). Can also be a single number, representing the number of initial
+characters of \code{source} IDs to derive target IDs from (useful for aggregating up nested groups).}
 
 \item{map}{A list with entries named with \code{source} IDs (or aligning with those IDs),
 containing vectors of associated \code{target} IDs (or indices of those IDs). Entries

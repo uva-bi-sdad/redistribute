@@ -1,7 +1,7 @@
 #' Download U.S. Census Microdata
 #'
 #' Download and load U.S. census American Community Survey (ACS) Public Use Microdata Samples (PUMS):
-#' [census.gov/programs-surveys/acs/microdata.html](https://www.census.gov/programs-surveys/acs/microdata.html)
+#' (census.gov/programs-surveys/acs/microdata.html)[https://www.census.gov/programs-surveys/acs/microdata.html]
 #'
 #'
 #' @param dir Directory in which to save the file(s).
