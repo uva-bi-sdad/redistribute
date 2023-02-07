@@ -241,7 +241,10 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of target IDs")
       map <- split(tid, substr(tid, 1, nchar(sid[1])))
     } else if (can_intersects && source_sf && target_sf) {
-      if (verbose) cli_alert_info("map: intersections between geometries")
+      if (verbose) {
+        cli_alert_info("map: intersections between geometries")
+        cli_progress_step("mapping...", msg_done = "done mapping")
+      }
       intersect_map <- TRUE
       op <- options(sf_use_s2 = FALSE)
       on.exit(options(sf_use_s2 = op[[1]]))
@@ -275,7 +278,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   } else {
     tiebreak <- c(f = "first", l = "last", r = "random")[tolower(substring(overlaps, 1, 1))]
     dodedupe <- !is.na(tiebreak)
-    deduper <- function(e, tm = tiebreak) {
+    deduper <- function(e, agg = TRUE, tm = tiebreak) {
       su <- which(e == max(e))
       if (length(su) > 1) {
         su <- switch(tm,
@@ -284,7 +287,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
           random = sample(su, 1)
         )
       }
-      e[su]
+      if (agg) e[su] else su
     }
   }
   any_partial <- FALSE
@@ -309,12 +312,16 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
             }
           }
           names(w) <- if (is.integer(e)) tid[e] else e
-          w
+          w[w > 0]
         } else {
           e
         }
-        if (dodedupe) {
-          deduper(res)
+        if (aggregate && dodedupe) {
+          if (length(res) > 1) {
+            deduper(res)
+          } else {
+            res
+          }
         } else {
           if (!aggregate && any(res < 1)) any_partial <<- TRUE
           res
@@ -334,7 +341,30 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       e
     })
   }
-  names(map) <- sid
+  if (dodedupe && any_partial) {
+    if (verbose) cli_alert_info("assigning each target to a single source")
+    any_partial <- FALSE
+    targets <- unlist(unname(map))
+    esids <- factor(rep(sid, vapply(map, length, 0)), unique(sid))
+    if (anyDuplicated(names(targets))) {
+      for (ct in unique(names(targets))) {
+        su <- which(names(targets) == ct)
+        if (length(su) > 1) {
+          sel <- deduper(targets[su], FALSE)
+          targets[su[-sel]] <- 0
+          targets[su[sel]] <- 1
+        }
+      }
+      su <- which(targets != 0)
+      map <- split(targets[su], esids[su])
+    } else {
+      targets[] <- 1L
+      map <- split(targets, esids)
+    }
+  } else {
+    names(map) <- sid
+  }
+  if (verbose && intersect_map) cli_progress_done()
   if (return_map) {
     if (verbose) cli_alert_info("returning map")
     return(map)
@@ -398,7 +428,10 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     }
   }
   if (verbose) {
-    cli_alert_info("{if (aggregate) 'aggregating' else 'disaggregating'} {.field {length(source_numeric)}} variable{?s}:")
+    cli_alert_info(paste(
+      "redistributing {.field {length(source_numeric)}} variable{?s}",
+      "from {.field {length(sid)}} source{?s} to {.field {length(tid)}} target{?s}:"
+    ))
     var_groups <- split(colnames(source), !source_numeric)
     names(var_groups) <- c(
       "TRUE" = "(char; {sum(!source_numeric)})", "FALSE" = "(numb; {sum(source_numeric)})"
@@ -409,6 +442,8 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       }, ""),
       names = rep("*", length(var_groups))
     ))
+    type <- if (aggregate) "aggregating" else "disaggregating"
+    cli_progress_step(paste0(type, "..."), msg_done = paste("done", type))
   }
   method <- as.integer(source_numeric)
   if (any_partial) aggregate <- TRUE
@@ -420,6 +455,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   res <- process_distribute(as.matrix(source), method, tid, w, map, aggregate, balance)
   res <- as.data.frame(res)
   colnames(res) <- colnames(source)
+  if (verbose) cli_progress_done()
   if (!all(source_numeric)) {
     if (verbose) cli_alert_info("re-converting categorical levels")
     for (l in level_map) {
@@ -437,10 +473,11 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     rownames(res) <- NULL
   }
   if (!is.null(outFile)) {
-    if (verbose) cli_alert_info("writing results to {.file {outFile}}")
+    if (verbose) cli_progress_step("writing results to {.file {outFile}}")
     dir.create(dirname(outFile), FALSE, TRUE)
     if (!grepl("\\.\\w", outFile)) outFile <- paste0(outFile, ".csv")
     vroom_write(res, outFile, ",")
+    if (verbose) cli_progress_done()
   }
   if (return_geometry && target_sf) st_geometry(res) <- st_geometry(target)
   invisible(res)

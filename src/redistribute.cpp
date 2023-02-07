@@ -107,7 +107,7 @@ struct Distribute : public Worker {
     index_weight(index_weight), weight_totals(weight_totals), method(method), agg(agg)
   {}
   void operator()(size_t s, size_t e){
-    int ck = 1e3, c = 0;
+    int c = 0;
     for (; s < e; s++) {
       const int ss = start[s], se = end[s] + 1;
       if (ss > -1) {
@@ -127,10 +127,6 @@ struct Distribute : public Worker {
                 );
                 break;
             }
-            if (!--ck) {
-              checkUserInterrupt();
-              ck = 1e3;
-            }
           }
         } else {
           const double total = weight_totals[s];
@@ -146,10 +142,6 @@ struct Distribute : public Worker {
                   proportional_numeric(os, source_row[c], ss, se, index, weight, total, res, index_weight);
                 }
                 break;
-            }
-            if (!--ck) {
-              checkUserInterrupt();
-              ck = 1e3;
             }
           }
         }
@@ -253,6 +245,7 @@ NumericVector process_distribute(
 
   // process
   Distribute distributed(res, s, start, end, index, weight, index_weight, weight_totals, method, agg);
+  checkUserInterrupt();
   parallelFor(0, iter_max, distributed);
 
   res.attr("dim") = Dimension(target_n, nvars);
