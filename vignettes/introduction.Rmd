@@ -22,6 +22,7 @@ knitr::opts_chunk$set(
   fig.width = 8.1
 )
 library(sf)
+base_dir <- "../../introduction"
 ```
 
 The basic premise behind any form of redistribution is that a given set of
@@ -80,20 +81,23 @@ In this case, we can re-aggregate what we initially disaggregated, to recover th
 One use case for redistribution is converting demographics data between geographic layers.
 
 For illustration, we can look at U.S. Census data in Fairfax, Virginia:
+```r
+base_dir <- "~/Downloads"
+```
 ```{r}
 # remotes::install_github("uva-bi-sdad/catchment")
 library(catchment)
 library(sf)
 
 # download population and data shapes
-population <- download_census_population("~/Downloads", "VA", 2020)$estimates
+population <- download_census_population(base_dir, "VA", 2020)$estimates
 population <- population[grepl("^51(?:059|600)", population$GEOID), ]
 population[, -1] <- vapply(
   population[, -1], as.numeric, numeric(nrow(population))
 )
 rownames(population) <- population$GEOID
 block_groups <- st_transform(
-  download_census_shapes("~/Downloads", "VA", "bg", year = 2020), "WGS84"
+  download_census_shapes(base_dir, "VA", "bg", year = 2020), "WGS84"
 )
 block_groups <- block_groups[block_groups$GEOID %in% population$GEOID, ]
 population <- population[block_groups$GEOID, ]
@@ -137,7 +141,7 @@ We could try aggregating directly from block groups to zip codes, which
 involves calculating proportional intersections between region polygons:
 ```{r}
 # Download shapes if needed
-zipcode_file <- "~/Downloads/zipcode_va_fairfax.geojson"
+zipcode_file <- paste0(base_dir, "/zipcode_va_fairfax.geojson")
 if (!file.exists(zipcode_file)) {
   download.file(paste0(
     "https://www.fairfaxcounty.gov/euclid/rest/services/IPLS/IPLSMap",
@@ -157,7 +161,7 @@ We could also disaggregate to the parcel level, which are point locations, then 
 ```{r}
 # Download shapes if needed
 ## https://data-fairfaxcountygis.opendata.arcgis.com/datasets/current-population
-parcel_file <- "~/Downloads/parcel_va_fairfax.geojson"
+parcel_file <- paste0(base_dir, "/parcel_va_fairfax.geojson")
 if (!file.exists(parcel_file)) {
   download.file(paste0(
     "https://opendata.arcgis.com/api/v3/datasets/",

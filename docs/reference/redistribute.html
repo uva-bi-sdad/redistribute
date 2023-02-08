@@ -24,6 +24,7 @@
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/estimate_comparisons.html">Estimate Comparisons</a>
     <a class="dropdown-item" href="../articles/introduction.html">Introduction to Redistribution</a>
   </div>
 </li>
@@ -71,7 +72,9 @@ the real or more complete dataset, and is often at a lower resolution / higher l
 
 <dt>target</dt>
 <dd><p>A matrix-like object you want to distribute to: usually this will be
-the dataset you want but isn't available, and is often at a higher resolution / lower level.</p></dd>
+the dataset you want but isn't available, and is often at a higher resolution / lower level
+(for disaggregation). Can also be a single number, representing the number of initial
+characters of <code>source</code> IDs to derive target IDs from (useful for aggregating up nested groups).</p></dd>
 
 
 <dt>map</dt>
@@ -175,8 +178,11 @@ redistribution. Useful if you want to inspect an automatically created map, or u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target IDs: `target` vector</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: all target IDs for single source</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables from <span style="color: #00BB00;">1</span> source to <span style="color: #00BB00;">5</span> targets:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 2) a, b</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> done disaggregating <span style="color: #B2B2B2;">[9ms]</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id   a   b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 0.2 0.4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2  2 0.2 0.4</span>
@@ -195,21 +201,24 @@ redistribution. Useful if you want to inspect an automatically created map, or u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> target IDs: <span style="color: #00BB00;">id</span> column of `target`</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> map: first <span style="color: #00BB00;">1</span> character of target IDs</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> weights: <span style="color: #00BB00;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating <span style="color: #00BB00;">2</span> variables:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables from <span style="color: #00BB00;">2</span> sources to <span style="color: #00BB00;">10</span> targets:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 1) num</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char; 1) cat</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> done disaggregating <span style="color: #B2B2B2;">[6ms]</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    id cat num</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  a5 aaa 0.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a4 aaa 0.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  a1 aaa 0.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  b5 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a2 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a2 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  a4 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  a1 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  b2 bbb 0.4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6  b3 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b2 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b5 bbb 0.4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 8  b4 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b1 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 a3 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  a3 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 b1 bbb 0.4</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

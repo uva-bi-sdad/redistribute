@@ -1,0 +1,210 @@
+---
+title: "Estimate Comparisons"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Estimate Comparisons}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+*Built with R 
+`r getRversion()`*
+
+***
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.height = 12,
+  dev = "CairoSVG",
+  fig.ext = "svg"
+)
+library(redistribute)
+library(sf)
+library(ggplot2)
+base_dir <- "../../estimate_comparison"
+```
+
+Redistribution means rearranging values such that totals remain the same, and the original
+distribution could be recovered when re-aggregating from a perfectly contained disaggregate.
+
+This may be desirable if your goal is to simply display the same data in different forms.
+
+If, however, your goal is to come up with values at scales you don't have observations of,
+it may be desirable to combine various observations at different scales and use them to
+come up with new estimates.
+
+In the case of estimation, there are many more methods to consider,
+and validating their results is less straightforward, so this article will consider a few
+estimation and validation methods.
+
+# Data
+
+We'll focus on a single county (Arlington, VA), with census block groups
+and Public Use Microdata Samples (PUMS) as our primary source data.
+
+```r
+# directory to save data in
+base_dir <- "../estimate_comparison"
+dir.create(base_dir, FALSE)
+```
+
+```{r, warn=FALSE}
+# geographies
+library(catchment)
+geography_bg <- download_census_shapes(base_dir, "va", "bg", year = 2021)
+geography_bg <- geography_bg[grep("^51013", geography_bg$GEOID), ]
+geography_tr <- download_census_shapes(base_dir, "va", "tr", year = 2021)
+geography_tr <- geography_tr[grep("^51013", geography_tr$GEOID), ]
+
+# ACS data
+
+## block groups
+block_groups <- download_census_population(
+  base_dir, "va", 2021,
+  counties = 51013
+)$estimates
+colnames(block_groups)[2] <- "Total"
+block_groups$RACE_Total_Other <- block_groups$RACE_Total - rowSums(
+  block_groups[, grep("^RACE_Total_", colnames(block_groups)), drop = TRUE]
+)
+
+library(sf)
+rownames(geography_bg) <- geography_bg$GEOID
+st_geometry(block_groups) <- st_geometry(geography_bg[block_groups$GEOID, ])
+
+# parcel data
+parcel_file <- paste0(base_dir, "/parcels.rds")
+if (!file.exists(parcel_file)) {
+  parcels <- st_read(paste0(
+    "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_MHUD_Polygons/",
+    "FeatureServer/0/query?where=1=1&outFields=*&outSR=4326&f=json"
+  ))
+  saveRDS(parcels, parcel_file, compress = "xz")
+}
+parcels <- readRDS(parcel_file)
+colnames(parcels)[colnames(parcels) == "Total_Units"] <- "Total"
+parcels$tract <- substring(parcels$Full_Block, 1, 11)
+```
+
+Ultimately, we'll want to use these methods to get values for unobserved geographies,
+but for this comparison of methods, we'll want a way to test their results against
+known values.
+
+For this test case, we can simply start at a higher geolayer, and make estimates
+at the block group level. To do that, we'll need to aggregate our block group data
+up to tracts:
+
+```{r}
+tracts <- redistribute(block_groups, geography_tr)
+```
+
+# Methods
+
+As a baseline, the first method to consider is proportional redistribution of the block group
+summary estimates alone.
+
+## Redistribution
+
+### Direct
+
+We could do this from tracts to block groups directly:
+
+```{r}
+# going from tracts to block groups with no information
+estimate_tr_to_bg <- redistribute(
+  tracts, block_groups,
+  source_id = "id"
+)
+
+# mean absolute error between total population estimates
+mean(abs(estimate_tr_to_bg$Total - block_groups$Total))
+```
+
+We can see in this case, the error introduce when we only have proportional
+information at the lower level; block groups that once varied within tract
+not have the same value:
+
+```{r, fig.show="hold", out.width="50%", warning=FALSE}
+library(ggplot2)
+library(scico)
+theme <- theme_void() %+replace%
+  theme(text = element_text(size = 22))
+
+selection <- grep("^51013100700", block_groups$GEOID)
+ggplot(block_groups[selection, ]) +
+  theme +
+  ggtitle("Original") +
+  geom_sf(aes(fill = Total)) +
+  geom_sf_label(aes(label = Total)) +
+  scale_fill_scico(palette = "lajolla")
+ggplot(estimate_tr_to_bg[selection, ]) +
+  theme +
+  ggtitle("From Tract") +
+  geom_sf(aes(fill = Total)) +
+  geom_sf_label(aes(label = round(Total, 2))) +
+  scale_fill_scico(palette = "lajolla")
+```
+
+### Down and Up
+
+Or from tracts down to parcels, and back up to block groups:
+```{r}
+# going from tracts to parcels
+map_tr_to_parcel <- redistribute(
+  tracts, parcels,
+  source_id = "id", target_id = "OBJECTID", return_map = TRUE
+)
+estimate_tr_to_parcel <- redistribute(
+  tracts, parcels, map_tr_to_parcel,
+  weight = "Total", source_id = "id", target_id = "OBJECTID"
+)
+
+# then from parcels to block groups
+map_parcel_to_bg <- redistribute(
+  estimate_tr_to_parcel, block_groups,
+  source_id = "id", target_id = "GEOID", return_map = TRUE
+)
+estimate_parcel_to_bg <- redistribute(
+  estimate_tr_to_parcel, block_groups, map_parcel_to_bg,
+  source_id = "id", target_id = "GEOID"
+)
+
+# mean absolute error between total population estimates
+mean(abs(estimate_parcel_to_bg$Total - block_groups$Total))
+```
+
+Now there is more of the original variation between block groups:
+
+```{r, fig.show="hold", out.width="50%", warning=FALSE}
+map <- redistribute(
+  block_groups, estimate_tr_to_parcel,
+  return_map = TRUE
+)
+parcel_selection <- as.integer(unique(unlist(
+  lapply(map[selection], names),
+  use.names = FALSE
+)))
+
+ggplot(block_groups[selection, ]) +
+  theme +
+  ggtitle("Original") +
+  geom_sf(aes(fill = Total)) +
+  geom_sf_label(aes(label = Total)) +
+  scale_fill_scico(palette = "lajolla")
+ggplot() +
+  theme +
+  ggtitle("From Parcels From Tract") +
+  scale_fill_scico(palette = "lajolla") +
+  geom_sf(
+    aes(fill = Total),
+    estimate_parcel_to_bg[selection, "Total"]
+  ) +
+  geom_sf(aes(fill = Total), st_transform(
+    parcels[parcel_selection, "Total"],
+    st_crs(estimate_parcel_to_bg)
+  ))
+```
