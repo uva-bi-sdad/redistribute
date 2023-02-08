@@ -221,7 +221,17 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     if (is.null(names(map))) {
       if (length(map) != length(sid)) cli_abort("{.arg map} has no names, and is not the same length as source IDs")
       names(map) <- sid
-    } else if (!any(sid %in% names(map))) cli_abort("no source IDs were present in the ID map")
+    } else if (!any(sid %in% names(map))) {
+      mw <- unlist(unname(map))
+      onames <- names(mw)
+      if (!any(sid %in% onames)) {
+        cli_abort("no source IDs were present in the ID map")
+      } else {
+        if (verbose) cli_alert_info("inverting map")
+        names(mw) <- rep(names(map), vapply(map, length, 0))
+        map <- split(mw, onames)
+      }
+    }
   } else {
     if (nrow(source) == 1) {
       if (verbose) cli_alert_info("map: all target IDs for single source")
