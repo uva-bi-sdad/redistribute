@@ -101,7 +101,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   } else if (source_id %in% colnames(source)) {
     if (verbose) cli_alert_info("source IDs: {.field {source_id}} column of {.arg source}")
     sid <- source[, source_id, drop = TRUE]
-    source <- source[, colnames(source) != source_id]
+    source <- source[, colnames(source) != source_id, drop = FALSE]
   } else if (nrow(source) == 1) {
     if (verbose) cli_alert_info("source IDs: {.field 1}")
     sid <- if (missing(source_id)) "1" else source_id
@@ -171,7 +171,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   } else if (!is.null(target_id) && length(dim(target)) == 2 && target_id %in% colnames(target)) {
     if (verbose) cli_alert_info("target IDs: {.field {target_id}} column of {.arg target}")
     tid <- target[, target_id, drop = TRUE]
-    target <- target[, colnames(target) != target_id]
+    target <- target[, colnames(target) != target_id, drop = FALSE]
   } else {
     if (length(dim(target)) != 2) {
       if (is.null(weight) && is.numeric(target) && !is.null(names(target))) {
@@ -222,6 +222,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       if (length(map) != length(sid)) cli_abort("{.arg map} has no names, and is not the same length as source IDs")
       names(map) <- sid
     } else if (!any(sid %in% names(map))) {
+      if (!any(tid %in% names(map))) cli_abort("no source or target IDs were in map names")
       mw <- unlist(unname(map))
       onames <- names(mw)
       if (!any(sid %in% onames)) {
@@ -404,7 +405,12 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   realign <- FALSE
   su <- tid %in% mtid
   if (!all(su)) {
-    if (verbose) cli_alert_info("some {.arg target_id}s were dropped because they were not present in {.arg map}")
+    if (verbose) {
+      cli_alert_info(paste(
+        "{.field {sum(!su)}} of {.field {length(su)}} target IDs",
+        "were dropped because they were not present in {.arg map}"
+      ))
+    }
     realign <- TRUE
     otid <- tid
     tid <- tid[su]
