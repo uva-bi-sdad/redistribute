@@ -55,7 +55,7 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">make_parent_polygons</span><span class="op">(</span><span class="va">polygons</span>, n <span class="op">=</span> <span class="fl">3</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">make_parent_polygons</span><span class="op">(</span><span class="va">polygons</span>, n <span class="op">=</span> <span class="fl">2</span>, strict_n <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -66,6 +66,13 @@
 
 <dt>n</dt>
 <dd><p>Number of polygons to aim to combine for each new polygon.</p></dd>
+
+
+<dt>strict_n</dt>
+<dd><p>Logical; if <code>TRUE</code> (default), <code>n</code> represents the number of
+intersecting polygons to select, depending on availability (with a minimum of 2).
+If <code>FALSE</code>, <code>n</code> represents the number of nearest polygons (by centroid)
+to use when calculating a box to use when selecting polygons (with a minimum of 1).</p></dd>
 
 
 <dt>verbose</dt>

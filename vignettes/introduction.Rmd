@@ -22,7 +22,8 @@ knitr::opts_chunk$set(
   fig.width = 8.1
 )
 library(sf)
-base_dir <- "../../introduction"
+base_dir <- "../introduction"
+if (!dir.exists(base_dir)) base_dir <- "../../introduction"
 ```
 
 The basic premise behind any form of redistribution is that a given set of

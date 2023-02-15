@@ -113,15 +113,46 @@ data.</p>
 <span><span class="co"># ACS data</span></span>
 <span></span>
 <span><span class="co">## block groups</span></span>
-<span><span class="va">block_groups</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/catchment/man/download_census_population.html" class="external-link">download_census_population</a></span><span class="op">(</span></span>
-<span>  <span class="va">base_dir</span>, <span class="st">"va"</span>, <span class="fl">2021</span>,</span>
-<span>  counties <span class="op">=</span> <span class="fl">51013</span></span>
-<span><span class="op">)</span><span class="op">$</span><span class="va">estimates</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> loading existing Virginia population data</span></span>
+<span><span class="va">block_groups</span> <span class="op">&lt;-</span> <span class="fu">tidycensus</span><span class="fu">::</span><span class="fu"><a href="https://walker-data.com/tidycensus/reference/get_acs.html" class="external-link">get_acs</a></span><span class="op">(</span></span>
+<span>  year <span class="op">=</span> <span class="fl">2021</span>,</span>
+<span>  state <span class="op">=</span> <span class="st">"51"</span>,</span>
+<span>  county <span class="op">=</span> <span class="st">"013"</span>,</span>
+<span>  geography <span class="op">=</span> <span class="st">"block group"</span>,</span>
+<span>  output <span class="op">=</span> <span class="st">"wide"</span>,</span>
+<span>  variables <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    total <span class="op">=</span> <span class="st">"B01001_001"</span>,</span>
+<span>    race_white <span class="op">=</span> <span class="st">"B02001_002"</span>,</span>
+<span>    race_black <span class="op">=</span> <span class="st">"B02001_003"</span>,</span>
+<span>    race_native <span class="op">=</span> <span class="st">"B02001_004"</span>,</span>
+<span>    race_asian <span class="op">=</span> <span class="st">"B02001_005"</span>,</span>
+<span>    sex_male <span class="op">=</span> <span class="st">"B01001_002"</span>,</span>
+<span>    sex_female <span class="op">=</span> <span class="st">"B01001_026"</span>,</span>
+<span>    tenure_total <span class="op">=</span> <span class="st">"B25003_001"</span>,</span>
+<span>    tenure_owner <span class="op">=</span> <span class="st">"B25003_002"</span>,</span>
+<span>    tenure_renter <span class="op">=</span> <span class="st">"B25003_003"</span>,</span>
+<span>    income_total <span class="op">=</span> <span class="st">"B19001_001"</span>,</span>
+<span>    income_lt10 <span class="op">=</span> <span class="st">"B19001_002"</span>,</span>
+<span>    income_10_15 <span class="op">=</span> <span class="st">"B19001_003"</span>,</span>
+<span>    income_15_20 <span class="op">=</span> <span class="st">"B19001_004"</span>,</span>
+<span>    income_20_25 <span class="op">=</span> <span class="st">"B19001_005"</span>,</span>
+<span>    income_25_30 <span class="op">=</span> <span class="st">"B19001_006"</span>,</span>
+<span>    income_30_35 <span class="op">=</span> <span class="st">"B19001_007"</span>,</span>
+<span>    income_35_40 <span class="op">=</span> <span class="st">"B19001_008"</span>,</span>
+<span>    income_40_45 <span class="op">=</span> <span class="st">"B19001_009"</span>,</span>
+<span>    income_45_50 <span class="op">=</span> <span class="st">"B19001_010"</span>,</span>
+<span>    income_100_125 <span class="op">=</span> <span class="st">"B19001_014"</span>,</span>
+<span>    income_125_150 <span class="op">=</span> <span class="st">"B19001_015"</span>,</span>
+<span>    income_150_200 <span class="op">=</span> <span class="st">"B19001_016"</span>,</span>
+<span>    income_gt200 <span class="op">=</span> <span class="st">"B19001_017"</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">[</span>, <span class="op">-</span><span class="fl">2</span><span class="op">]</span></span>
+<span><span class="co">#&gt; Getting data from the 2017-2021 5-year ACS</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"Total"</span></span>
-<span><span class="va">block_groups</span><span class="op">$</span><span class="va">RACE_Total_Other</span> <span class="op">&lt;-</span> <span class="va">block_groups</span><span class="op">$</span><span class="va">RACE_Total</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span></span>
-<span>  <span class="va">block_groups</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^RACE_Total_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">)</span><span class="op">)</span>, drop <span class="op">=</span> <span class="cn">TRUE</span><span class="op">]</span></span>
+<span><span class="va">block_groups</span><span class="op">$</span><span class="va">race_other</span> <span class="op">&lt;-</span> <span class="va">block_groups</span><span class="op">$</span><span class="va">Total</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span></span>
+<span>  <span class="va">block_groups</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^race_.*E$"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">sub</a></span><span class="op">(</span><span class="st">"E$"</span>, <span class="st">""</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">block_groups</span> <span class="op">&lt;-</span> <span class="va">block_groups</span><span class="op">[</span><span class="va">block_groups</span><span class="op">$</span><span class="va">Total</span> <span class="op">!=</span> <span class="fl">0</span>, <span class="op">]</span></span>
 <span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-spatial.github.io/sf/" class="external-link">sf</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">geography_bg</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">geography_bg</span><span class="op">$</span><span class="va">GEOID</span></span>
@@ -138,7 +169,8 @@ data.</p>
 <span><span class="op">}</span></span>
 <span><span class="va">parcels</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">parcel_file</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">parcels</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">parcels</span><span class="op">)</span> <span class="op">==</span> <span class="st">"Total_Units"</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"Total"</span></span>
-<span><span class="va">parcels</span><span class="op">$</span><span class="va">tract</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/substr.html" class="external-link">substring</a></span><span class="op">(</span><span class="va">parcels</span><span class="op">$</span><span class="va">Full_Block</span>, <span class="fl">1</span>, <span class="fl">11</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">parcels</span><span class="op">$</span><span class="va">tract</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/substr.html" class="external-link">substring</a></span><span class="op">(</span><span class="va">parcels</span><span class="op">$</span><span class="va">Full_Block</span>, <span class="fl">1</span>, <span class="fl">11</span><span class="op">)</span></span>
+<span><span class="va">parcels</span> <span class="op">&lt;-</span> <span class="va">parcels</span><span class="op">[</span><span class="va">parcels</span><span class="op">$</span><span class="va">Year_Built</span> <span class="op">&lt;=</span> <span class="fl">2021</span>, <span class="op">]</span></span></code></pre></div>
 <p>Ultimately, we’ll want to use these methods to get values for
 unobserved geographies, but for this comparison of methods, we’ll want a
 way to test their results against known values.</p>
@@ -173,32 +205,13 @@ redistribution of the block group summary estimates alone.</p>
 <p>We can see in this case, the error introduce when we only have
 proportional information at the lower level; block groups that once
 varied within tract not have the same value:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/thomasp85/scico" class="external-link">scico</a></span><span class="op">)</span></span>
-<span><span class="va">theme</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_void</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://ggplot2.tidyverse.org/reference/theme_get.html" class="external-link">%+replace%</a></span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>text <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">22</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">selection</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^51013100700"</span>, <span class="va">block_groups</span><span class="op">$</span><span class="va">GEOID</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">[</span><span class="va">selection</span>, <span class="op">]</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="va">theme</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ggtitle</a></span><span class="op">(</span><span class="st">"Original"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="va">Total</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf_label</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>label <span class="op">=</span> <span class="va">Total</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/scico/man/ggplot2-scales.html" class="external-link">scale_fill_scico</a></span><span class="op">(</span>palette <span class="op">=</span> <span class="st">"lajolla"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">estimate_tr_to_bg</span><span class="op">[</span><span class="va">selection</span>, <span class="op">]</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="va">theme</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ggtitle</a></span><span class="op">(</span><span class="st">"From Tract"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="va">Total</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf_label</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">Total</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/scico/man/ggplot2-scales.html" class="external-link">scale_fill_scico</a></span><span class="op">(</span>palette <span class="op">=</span> <span class="st">"lajolla"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="estimate_comparisons_files/figure-html/unnamed-chunk-5-1.svg" width="50%"><img src="estimate_comparisons_files/figure-html/unnamed-chunk-5-2.svg" width="50%"></p>
 </div>
 <div class="section level4">
 <h4 id="down-and-up">Down and Up<a class="anchor" aria-label="anchor" href="#down-and-up"></a>
 </h4>
 <p>Or from tracts down to parcels, and back up to block groups:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># going from tracts to parcels</span></span>
 <span><span class="va">map_tr_to_parcel</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
 <span>  <span class="va">tracts</span>, <span class="va">parcels</span>,</span>
@@ -221,37 +234,503 @@ varied within tract not have the same value:</p>
 <span></span>
 <span><span class="co"># mean absolute error between total population estimates</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">estimate_parcel_to_bg</span><span class="op">$</span><span class="va">Total</span> <span class="op">-</span> <span class="va">block_groups</span><span class="op">$</span><span class="va">Total</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 221.9761</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 222.5203</span></span></code></pre></div>
 <p>Now there is more of the original variation between block groups:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">map</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
-<span>  <span class="va">block_groups</span>, <span class="va">estimate_tr_to_parcel</span>,</span>
-<span>  return_map <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">parcel_selection</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">map</span><span class="op">[</span><span class="va">selection</span><span class="op">]</span>, <span class="va">names</span><span class="op">)</span>,</span>
-<span>  use.names <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">block_groups</span><span class="op">[</span><span class="va">selection</span>, <span class="op">]</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="va">theme</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ggtitle</a></span><span class="op">(</span><span class="st">"Original"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="va">Total</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf_label</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>label <span class="op">=</span> <span class="va">Total</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/scico/man/ggplot2-scales.html" class="external-link">scale_fill_scico</a></span><span class="op">(</span>palette <span class="op">=</span> <span class="st">"lajolla"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="va">theme</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ggtitle</a></span><span class="op">(</span><span class="st">"From Parcels From Tract"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/scico/man/ggplot2-scales.html" class="external-link">scale_fill_scico</a></span><span class="op">(</span>palette <span class="op">=</span> <span class="st">"lajolla"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf</a></span><span class="op">(</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="va">Total</span><span class="op">)</span>,</span>
-<span>    <span class="va">estimate_parcel_to_bg</span><span class="op">[</span><span class="va">selection</span>, <span class="st">"Total"</span><span class="op">]</span></span>
-<span>  <span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="va">Total</span><span class="op">)</span>, <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_transform.html" class="external-link">st_transform</a></span><span class="op">(</span></span>
-<span>    <span class="va">parcels</span><span class="op">[</span><span class="va">parcel_selection</span>, <span class="st">"Total"</span><span class="op">]</span>,</span>
-<span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_crs.html" class="external-link">st_crs</a></span><span class="op">(</span><span class="va">estimate_parcel_to_bg</span><span class="op">)</span></span>
-<span>  <span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><img src="estimate_comparisons_files/figure-html/unnamed-chunk-7-1.svg" width="50%"><img src="estimate_comparisons_files/figure-html/unnamed-chunk-7-2.svg" width="50%"></p>
+<p>Because the parcel totals are living units rather than individuals,
+we may be able to refine our redistribution based on some heuristic
+estimates (with some tweaking) of number of people per living unit:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># start with number of units</span></span>
+<span><span class="va">parcels</span><span class="op">$</span><span class="va">Residents</span> <span class="op">&lt;-</span> <span class="va">parcels</span><span class="op">$</span><span class="va">Total</span></span>
+<span></span>
+<span><span class="co">## for parcels with more than 1 unit, assume 2.255 per unit</span></span>
+<span><span class="va">su</span> <span class="op">&lt;-</span> <span class="va">parcels</span><span class="op">$</span><span class="va">Total</span> <span class="op">&gt;</span> <span class="fl">1</span></span>
+<span><span class="va">parcels</span><span class="op">$</span><span class="va">Residents</span><span class="op">[</span><span class="va">su</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">parcels</span><span class="op">$</span><span class="va">Total</span><span class="op">[</span><span class="va">su</span><span class="op">]</span> <span class="op">*</span> <span class="fl">2.255</span></span>
+<span></span>
+<span><span class="co">## for 1-unit parcels, base on size</span></span>
+<span><span class="va">su</span> <span class="op">&lt;-</span> <span class="va">parcels</span><span class="op">$</span><span class="va">Total</span> <span class="op">==</span> <span class="fl">1</span></span>
+<span><span class="va">parcels</span><span class="op">$</span><span class="va">Residents</span><span class="op">[</span><span class="va">su</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut</a></span><span class="op">(</span></span>
+<span>  <span class="va">parcels</span><span class="op">$</span><span class="va">Shape__Area</span><span class="op">[</span><span class="va">su</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="cn">Inf</span>, <span class="fl">9170</span>, <span class="fl">9550</span>, <span class="fl">48000</span>, <span class="cn">Inf</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">4</span></span>
+<span><span class="va">parcels</span><span class="op">$</span><span class="va">Residents</span><span class="op">[</span><span class="va">su</span> <span class="op">&amp;</span> <span class="va">parcels</span><span class="op">$</span><span class="va">Residents</span> <span class="op">&gt;</span> <span class="fl">7</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">137.7</span></span>
+<span></span>
+<span><span class="co"># now see if this improved our redistribution</span></span>
+<span><span class="va">estimate_tr_to_parcel</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
+<span>  <span class="va">tracts</span>, <span class="va">parcels</span>, <span class="va">map_tr_to_parcel</span>,</span>
+<span>  weight <span class="op">=</span> <span class="st">"Residents"</span>, source_id <span class="op">=</span> <span class="st">"id"</span>, target_id <span class="op">=</span> <span class="st">"OBJECTID"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">estimate_parcel_to_bg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
+<span>  <span class="va">estimate_tr_to_parcel</span>, <span class="va">block_groups</span>, <span class="va">map_parcel_to_bg</span>,</span>
+<span>  source_id <span class="op">=</span> <span class="st">"id"</span>, target_id <span class="op">=</span> <span class="st">"GEOID"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># mean absolute error between total population estimates</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">estimate_parcel_to_bg</span><span class="op">$</span><span class="va">Total</span> <span class="op">-</span> <span class="va">block_groups</span><span class="op">$</span><span class="va">Total</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 180.7739</span></span></code></pre></div>
+</div>
+</div>
+<div class="section level3">
+<h3 id="estimation">Estimation<a class="anchor" aria-label="anchor" href="#estimation"></a>
+</h3>
+<div class="section level4">
+<h4 id="pums-associations">PUMS Associations<a class="anchor" aria-label="anchor" href="#pums-associations"></a>
+</h4>
+<p>So far, we’ve used some additional information (total units) at the
+parcel level to improve the distribution of values across block groups,
+relative to a uniform distribution.</p>
+<p>We have some more information at the parcel level, such as unit type
+and number of renter versus owner residents, but to make use of this
+information, we need some association between source values and those
+features. This is where the census microdata sample can come in: the
+Public Use Microdata Sample (PUMS) consists of individual-level
+observations that include demographic features and housing features.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pums</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/download_census_pums.html">download_census_pums</a></span><span class="op">(</span><span class="va">base_dir</span>, <span class="st">"va"</span>, <span class="fl">2021</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> loading household sample: <span style="color: #00BB00;">h1-Year.csv.xz</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> loading person sample: <span style="color: #00BB00;">p1-Year.csv.xz</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> loading crosswalk <span style="color: #00BB00;">2020_Census_Tract_to_2020_PUMA.txt</span></span></span>
+<span></span>
+<span><span class="co"># prepare IDs</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">$</span><span class="va">GEOID</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">paste0</span>, <span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">$</span><span class="va">ID</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">paste0</span>, <span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SERIALNO"</span>, <span class="st">"SPORDER"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># prepare variables</span></span>
+<span></span>
+<span><span class="co">## survey categories</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">$</span><span class="va">sex_cat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sex_male"</span>, <span class="st">"sex_female"</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">$</span><span class="va">SEX</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">$</span><span class="va">race_cat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"race_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"white"</span>, <span class="st">"black"</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="st">"native"</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"asian"</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="st">"other"</span>, <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">$</span><span class="va">RAC1P</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="va">income_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"income_\\d[_0-9]+$"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">tracts</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">income_cat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">HINCP</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="op">-</span><span class="cn">Inf</span>, <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"^income_|_[0-9]+$"</span>, <span class="st">""</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">tracts</span><span class="op">)</span><span class="op">[</span><span class="va">income_cols</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  <span class="fl">200</span>, <span class="cn">Inf</span></span>
+<span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"income_lt10"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">tracts</span><span class="op">)</span><span class="op">[</span><span class="va">income_cols</span><span class="op">]</span>, <span class="st">"income_gt200"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## unit categories</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">building_type</span> <span class="op">&lt;-</span> <span class="st">"OTHER"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">building_type</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">BLD</span> <span class="op">==</span> <span class="st">"02"</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"SFD"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">building_type</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">BLD</span> <span class="op">==</span> <span class="st">"03"</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"SFA"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">building_type</span><span class="op">[</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">BLD</span><span class="op">)</span> <span class="op">|</span> <span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">BLD</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"0"</span>, <span class="fl">4</span><span class="op">:</span><span class="fl">9</span><span class="op">)</span></span>
+<span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"MULTI"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span> <span class="op">&lt;-</span> <span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">building_type</span> <span class="op">!=</span> <span class="st">"OTHER"</span>, <span class="op">]</span></span>
+<span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">status</span> <span class="op">&lt;-</span> <span class="st">"OTHER"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">status</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">TEN</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"OWNER"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">status</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">TEN</span> <span class="op">==</span> <span class="fl">3</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"RENTER"</span></span>
+<span><span class="va">pums</span><span class="op">$</span><span class="va">household</span> <span class="op">&lt;-</span> <span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">status</span> <span class="op">!=</span> <span class="st">"OTHER"</span>, <span class="op">]</span></span></code></pre></div>
+<p>The PUM sample is only located down to PUM areas, which are made up
+of tracts, so this is where we can start for a baseline.</p>
+<p>We will use associations between demographic and housing features
+within each PUMA to get probabilities at the parcel level, then
+redistribute our source values to them like before.</p>
+<p>The first step to this end is to prepare our data so it is easy to
+associate the individual PUMS variables with their per-level summaries
+at the tract level:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># define variables of interest</span></span>
+<span><span class="va">vars_house</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  ID <span class="op">=</span> <span class="st">"SERIALNO"</span>, weight <span class="op">=</span> <span class="st">"WGTP"</span>, type <span class="op">=</span> <span class="st">"building_type"</span>,</span>
+<span>  status <span class="op">=</span> <span class="st">"status"</span>, income <span class="op">=</span> <span class="st">"income_cat"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">vars_person</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  ID <span class="op">=</span> <span class="st">"ID"</span>, weight <span class="op">=</span> <span class="st">"PWGTP"</span>, sex_cat <span class="op">=</span> <span class="st">"sex_cat"</span>, race_cat <span class="op">=</span> <span class="st">"race_cat"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">vars_units</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  type <span class="op">=</span> <span class="st">"Unit_Type"</span>, renters <span class="op">=</span> <span class="st">"Renter_Occupied"</span>, owners <span class="op">=</span> <span class="st">"Owner_Occupied"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## get their levels</span></span>
+<span><span class="va">vars_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">vars_person</span><span class="op">[</span><span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span>, <span class="kw">function</span><span class="op">(</span><span class="va">var</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  income_cat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">income_cat</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">vars_list</span>, use.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">return_vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">vars_list</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># prepare datasets split into PUMAs</span></span>
+<span><span class="va">pumas_focal</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">$</span><span class="va">PUMA5CE</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">$</span><span class="va">GEOID</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">tracts</span><span class="op">$</span><span class="va">id</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/structure.html" class="external-link">structure</a></span><span class="op">(</span><span class="va">pumas_focal</span>, names <span class="op">=</span> <span class="va">pumas_focal</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">puma</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">households</span> <span class="op">&lt;-</span> <span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">household</span><span class="op">$</span><span class="va">PUMA</span> <span class="op">==</span> <span class="va">puma</span>, <span class="va">vars_house</span><span class="op">]</span></span>
+<span>  <span class="va">ids</span> <span class="op">&lt;-</span> <span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">$</span><span class="va">GEOID</span><span class="op">[</span></span>
+<span>    <span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">$</span><span class="va">PUMA5CE</span> <span class="op">==</span> <span class="va">puma</span> <span class="op">&amp;</span> <span class="va">pums</span><span class="op">$</span><span class="va">crosswalk</span><span class="op">$</span><span class="va">GEOID</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">tracts</span><span class="op">$</span><span class="va">id</span></span>
+<span>  <span class="op">]</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    households <span class="op">=</span> <span class="va">households</span>,</span>
+<span>    individuals <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">households</span><span class="op">)</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">r</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">h</span> <span class="op">&lt;-</span> <span class="va">households</span><span class="op">[</span><span class="va">r</span>, <span class="op">]</span></span>
+<span>      <span class="va">d</span> <span class="op">&lt;-</span> <span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">[</span><span class="va">pums</span><span class="op">$</span><span class="va">person</span><span class="op">$</span><span class="va">SERIALNO</span> <span class="op">==</span> <span class="va">h</span><span class="op">$</span><span class="va">SERIALNO</span>, <span class="va">vars_person</span><span class="op">]</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">h</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1L</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span><span class="op">)</span>, <span class="op">]</span>, <span class="va">d</span><span class="op">)</span></span>
+<span>    <span class="op">}</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    source <span class="op">=</span> <span class="va">tracts</span><span class="op">[</span><span class="va">tracts</span><span class="op">$</span><span class="va">id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">ids</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"id"</span>, <span class="va">vars</span><span class="op">)</span>, drop <span class="op">=</span> <span class="cn">TRUE</span><span class="op">]</span>,</span>
+<span>    parcels <span class="op">=</span> <span class="va">parcels</span><span class="op">[</span></span>
+<span>      <span class="va">parcels</span><span class="op">$</span><span class="va">tract</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">ids</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"tract"</span>, <span class="st">"OBJECTID"</span>, <span class="va">vars_units</span><span class="op">)</span>, drop <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>    <span class="op">]</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># function to apply each method to the data</span></span>
+<span><span class="va">apply_method</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">method</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">data</span>, <span class="kw">function</span><span class="op">(</span><span class="va">set</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">set</span><span class="op">$</span><span class="va">source</span><span class="op">$</span><span class="va">id</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">id</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">source</span> <span class="op">&lt;-</span> <span class="va">set</span><span class="op">$</span><span class="va">source</span><span class="op">[</span><span class="va">set</span><span class="op">$</span><span class="va">source</span><span class="op">$</span><span class="va">id</span> <span class="op">==</span> <span class="va">id</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span></span>
+<span>      <span class="va">target</span> <span class="op">&lt;-</span> <span class="va">set</span><span class="op">$</span><span class="va">parcels</span><span class="op">[</span><span class="va">set</span><span class="op">$</span><span class="va">parcels</span><span class="op">$</span><span class="va">tract</span> <span class="op">==</span> <span class="va">id</span>, <span class="op">]</span></span>
+<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">target</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>        <span class="va">est</span> <span class="op">&lt;-</span> <span class="fu">method</span><span class="op">(</span><span class="va">source</span>, <span class="va">target</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>, <span class="va">set</span><span class="op">$</span><span class="va">individuals</span><span class="op">)</span></span>
+<span>        <span class="va">su</span> <span class="op">&lt;-</span> <span class="op">!</span><span class="va">vars</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">est</span><span class="op">)</span></span>
+<span>        <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="va">su</span><span class="op">)</span><span class="op">)</span> <span class="va">est</span><span class="op">[</span>, <span class="va">vars</span><span class="op">[</span><span class="va">su</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>        <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">target</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span>, <span class="va">est</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">target</span><span class="op">$</span><span class="va">OBJECTID</span><span class="op">)</span>, <span class="va">vars</span><span class="op">]</span><span class="op">)</span></span>
+<span>      <span class="op">}</span></span>
+<span>    <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p>Now we can apply each method to this same set of data.</p>
+</div>
+<div class="section level4">
+<h4 id="initial-weights">Initial Weights<a class="anchor" aria-label="anchor" href="#initial-weights"></a>
+</h4>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">est_baseline</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">source</span>, <span class="va">target</span>, <span class="va">individuals</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">type</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">d</span> <span class="op">&lt;-</span> <span class="va">target</span><span class="op">[</span><span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span> <span class="op">==</span> <span class="va">type</span>, <span class="op">]</span></span>
+<span>    <span class="va">nd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span><span class="op">[</span><span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RENTER"</span>, <span class="st">"OWNER"</span><span class="op">)</span></span>
+<span>    <span class="va">i</span> <span class="op">&lt;-</span> <span class="va">individuals</span><span class="op">[</span></span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">building_type</span> <span class="op">==</span> <span class="va">type</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PWGTP"</span>, <span class="st">"status"</span>, <span class="va">return_vars</span><span class="op">)</span></span>
+<span>    <span class="op">]</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Reduce</a></span><span class="op">(</span><span class="st">"+"</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">i</span><span class="op">$</span><span class="va">status</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">ii</span> <span class="op">&lt;-</span> <span class="va">i</span><span class="op">[</span><span class="va">i</span><span class="op">$</span><span class="va">status</span> <span class="op">==</span> <span class="va">s</span>, <span class="op">]</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">cbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">return_vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">cat</span><span class="op">)</span> <span class="op">{</span></span>
+<span>        <span class="va">props</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">ii</span><span class="op">$</span><span class="va">PWGTP</span>, <span class="va">ii</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span>, <span class="va">sum</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">ii</span><span class="op">$</span><span class="va">PWGTP</span><span class="op">)</span></span>
+<span>        <span class="va">props</span><span class="op">[</span><span class="va">vars_list</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span><span class="op">[</span><span class="op">!</span><span class="va">vars_list</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>        <span class="va">props</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>        <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span></span>
+<span>          <span class="va">d</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">props</span>, each <span class="op">=</span> <span class="va">nd</span><span class="op">)</span>,</span>
+<span>          <span class="va">nd</span>, dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">d</span><span class="op">$</span><span class="va">OBJECTID</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">)</span></span>
+<span>        <span class="op">)</span></span>
+<span>      <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">}</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">estimate_parcel_baseline</span> <span class="op">&lt;-</span> <span class="fu">apply_method</span><span class="op">(</span><span class="va">data</span>, <span class="va">est_baseline</span><span class="op">)</span></span>
+<span><span class="va">estimate_baseline_to_bg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
+<span>  <span class="va">estimate_parcel_baseline</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>, <span class="va">block_groups</span>, <span class="va">map_parcel_to_bg</span>,</span>
+<span>  source_id <span class="op">=</span> <span class="st">"OBJECTID"</span>, target_id <span class="op">=</span> <span class="st">"GEOID"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level4">
+<h4 id="two-step-raking">Two Step Raking<a class="anchor" aria-label="anchor" href="#two-step-raking"></a>
+</h4>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">anesrake</span><span class="op">)</span></span>
+<span><span class="va">twostep_prep</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/eval.html" class="external-link">eval</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="op">{</span></span>
+<span>    <span class="kw">for</span> <span class="op">(</span><span class="va">var</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">totals</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>      <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">]</span></span>
+<span>      <span class="va">su</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span> <span class="op">|</span> <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span></span>
+<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">su</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>        <span class="va">individuals</span> <span class="op">&lt;-</span> <span class="va">individuals</span><span class="op">[</span><span class="op">!</span><span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">su</span><span class="op">)</span>, <span class="op">]</span></span>
+<span>        <span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/droplevels.html" class="external-link">droplevels</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span>, exclude <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">su</span><span class="op">)</span><span class="op">)</span></span>
+<span>        <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">]</span></span>
+<span>      <span class="op">}</span></span>
+<span>      <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">totals</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>    <span class="va">totals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Filter</a></span><span class="op">(</span><span class="va">length</span>, <span class="va">totals</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/sys.parent.html" class="external-link">parent.frame</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">est_twostep</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">source</span>, <span class="va">target</span>, <span class="va">individuals</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="co"># step 1: initial weights at household level</span></span>
+<span>  <span class="va">totals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    building_type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">target</span><span class="op">[</span>, <span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, <span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span>, <span class="va">sum</span><span class="op">)</span>,</span>
+<span>    status <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/structure.html" class="external-link">structure</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colSums</a></span><span class="op">(</span><span class="va">target</span><span class="op">[</span>, <span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RENTER"</span>, <span class="st">"OWNER"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    income_cat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">source</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^income_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">source</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="fu">twostep_prep</span><span class="op">(</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/capture.output.html" class="external-link">capture.output</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">$</span><span class="va">weight</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/anesrake/man/anesrake.html" class="external-link">anesrake</a></span><span class="op">(</span></span>
+<span>      <span class="va">totals</span>, <span class="va">individuals</span>, <span class="va">individuals</span><span class="op">$</span><span class="va">SERIALNO</span>, <span class="va">individuals</span><span class="op">$</span><span class="va">WGTP</span>,</span>
+<span>      pctlim <span class="op">=</span> <span class="fl">.001</span></span>
+<span>    <span class="op">)</span><span class="op">$</span><span class="va">weightvec</span><span class="op">[</span><span class="va">individuals</span><span class="op">$</span><span class="va">SERIALNO</span><span class="op">]</span>,</span>
+<span>    error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/warning.html" class="external-link">warning</a></span><span class="op">(</span><span class="va">e</span><span class="op">$</span><span class="va">message</span><span class="op">)</span></span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">WGTP</span></span>
+<span>    <span class="op">}</span></span>
+<span>  <span class="op">)</span><span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="co"># step 2: adjust at person level</span></span>
+<span>  <span class="va">totals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/structure.html" class="external-link">structure</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">vars_list</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span>, names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">vars_list</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span>,</span>
+<span>    <span class="kw">function</span><span class="op">(</span><span class="va">n</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">source</span><span class="op">[</span>, <span class="va">vars_list</span><span class="op">[[</span><span class="va">n</span><span class="op">]</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="fu">twostep_prep</span><span class="op">(</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/capture.output.html" class="external-link">capture.output</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">$</span><span class="va">weight</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/anesrake/man/anesrake.html" class="external-link">anesrake</a></span><span class="op">(</span></span>
+<span>      <span class="va">totals</span>, <span class="va">individuals</span>, <span class="va">individuals</span><span class="op">$</span><span class="va">ID</span>,</span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">PWGTP</span> <span class="op">*</span> <span class="va">individuals</span><span class="op">$</span><span class="va">weight</span> <span class="op">/</span> <span class="va">individuals</span><span class="op">$</span><span class="va">WGTP</span>,</span>
+<span>      pctlim <span class="op">=</span> <span class="fl">.001</span></span>
+<span>    <span class="op">)</span><span class="op">$</span><span class="va">weightvec</span><span class="op">[</span><span class="va">individuals</span><span class="op">$</span><span class="va">ID</span><span class="op">]</span>,</span>
+<span>    error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/warning.html" class="external-link">warning</a></span><span class="op">(</span><span class="va">e</span><span class="op">$</span><span class="va">message</span><span class="op">)</span></span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">PWGTP</span> <span class="op">*</span> <span class="va">individuals</span><span class="op">$</span><span class="va">weight</span> <span class="op">/</span> <span class="va">individuals</span><span class="op">$</span><span class="va">WGTP</span></span>
+<span>    <span class="op">}</span></span>
+<span>  <span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="co"># calculate proportions, and estimate parcel values</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">type</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">d</span> <span class="op">&lt;-</span> <span class="va">target</span><span class="op">[</span><span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span> <span class="op">==</span> <span class="va">type</span>, <span class="op">]</span></span>
+<span>    <span class="va">nd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span><span class="op">[</span><span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RENTER"</span>, <span class="st">"OWNER"</span><span class="op">)</span></span>
+<span>    <span class="va">i</span> <span class="op">&lt;-</span> <span class="va">individuals</span><span class="op">[</span></span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">building_type</span> <span class="op">==</span> <span class="va">type</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"weight"</span>, <span class="st">"status"</span>, <span class="va">return_vars</span><span class="op">)</span></span>
+<span>    <span class="op">]</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Reduce</a></span><span class="op">(</span><span class="st">"+"</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">i</span><span class="op">$</span><span class="va">status</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">ii</span> <span class="op">&lt;-</span> <span class="va">i</span><span class="op">[</span><span class="va">i</span><span class="op">$</span><span class="va">status</span> <span class="op">==</span> <span class="va">s</span>, <span class="op">]</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">cbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">return_vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">cat</span><span class="op">)</span> <span class="op">{</span></span>
+<span>        <span class="va">props</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">ii</span><span class="op">$</span><span class="va">weight</span>, <span class="va">ii</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span>, <span class="va">sum</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">ii</span><span class="op">$</span><span class="va">weight</span><span class="op">)</span></span>
+<span>        <span class="va">props</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>        <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span></span>
+<span>          <span class="va">d</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">props</span>, each <span class="op">=</span> <span class="va">nd</span><span class="op">)</span>,</span>
+<span>          <span class="va">nd</span>, dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">d</span><span class="op">$</span><span class="va">OBJECTID</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">)</span></span>
+<span>        <span class="op">)</span></span>
+<span>      <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">}</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">estimate_parcel_twostep</span> <span class="op">&lt;-</span> <span class="fu">apply_method</span><span class="op">(</span><span class="va">data</span>, <span class="va">est_twostep</span><span class="op">)</span></span>
+<span><span class="va">estimate_twostep_to_bg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
+<span>  <span class="va">estimate_parcel_twostep</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>, <span class="va">block_groups</span>, <span class="va">map_parcel_to_bg</span>,</span>
+<span>  source_id <span class="op">=</span> <span class="st">"OBJECTID"</span>, target_id <span class="op">=</span> <span class="st">"GEOID"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level4">
+<h4 id="generalized-raking">Generalized Raking<a class="anchor" aria-label="anchor" href="#generalized-raking"></a>
+</h4>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlfit.github.io/mlfit/" class="external-link">mlfit</a></span><span class="op">)</span></span>
+<span><span class="va">est_grake</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">source</span>, <span class="va">target</span>, <span class="va">individuals</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">person</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">vars_list</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span>, <span class="kw">function</span><span class="op">(</span><span class="va">n</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">l</span> <span class="op">&lt;-</span> <span class="va">vars_list</span><span class="op">[[</span><span class="va">n</span><span class="op">]</span><span class="op">]</span></span>
+<span>    <span class="va">s</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>level <span class="op">=</span> <span class="va">l</span>, count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">source</span><span class="op">[</span>, <span class="va">l</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">s</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">n</span></span>
+<span>    <span class="va">s</span></span>
+<span>  <span class="op">}</span><span class="op">)</span></span>
+<span>  <span class="va">household</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">$</span><span class="va">building_type</span><span class="op">)</span></span>
+<span>  <span class="va">household</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/structure.html" class="external-link">structure</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">household</span><span class="op">)</span><span class="op">)</span>, names <span class="op">=</span> <span class="va">household</span><span class="op">)</span></span>
+<span>  <span class="va">observed_types</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">target</span><span class="op">[</span>, <span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, <span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span>, <span class="va">sum</span><span class="op">)</span></span>
+<span>  <span class="va">household</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">observed_types</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">observed_types</span></span>
+<span>  <span class="va">household</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>building_type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">household</span><span class="op">)</span>, count <span class="op">=</span> <span class="va">household</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">household</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">count</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">household</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">count</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>  <span class="va">household</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    status <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RENTER"</span>, <span class="st">"OWNER"</span><span class="op">)</span>, count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colSums</a></span><span class="op">(</span><span class="va">target</span><span class="op">[</span>, <span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="va">household</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">source</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^income_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">source</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="va">household</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    income_cat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">household</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span><span class="op">)</span>, count <span class="op">=</span> <span class="va">household</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">household</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"building_type"</span>, <span class="st">"status"</span>, <span class="st">"income_cat"</span><span class="op">)</span></span>
+<span>  <span class="va">household</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">household</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">var</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">l</span> <span class="op">&lt;-</span> <span class="va">household</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span></span>
+<span>    <span class="va">l</span><span class="op">[</span><span class="va">l</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">individuals</span><span class="op">[</span>, <span class="va">var</span><span class="op">]</span><span class="op">)</span>,<span class="op">]</span></span>
+<span>  <span class="op">}</span><span class="op">)</span></span>
+<span>  <span class="va">m</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mlfit.github.io/mlfit/reference/ml_problem.html" class="external-link">ml_problem</a></span><span class="op">(</span></span>
+<span>    <span class="va">individuals</span>,</span>
+<span>    field_names <span class="op">=</span> <span class="fu"><a href="https://mlfit.github.io/mlfit/reference/ml_problem.html" class="external-link">special_field_names</a></span><span class="op">(</span><span class="st">"SERIALNO"</span>, <span class="st">"ID"</span>, count <span class="op">=</span> <span class="st">"count"</span><span class="op">)</span>,</span>
+<span>    group_controls <span class="op">=</span> <span class="va">household</span>,</span>
+<span>    individual_controls <span class="op">=</span> <span class="va">person</span>,</span>
+<span>    prior_weights <span class="op">=</span> <span class="va">individuals</span><span class="op">$</span><span class="va">WGTP</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="va">individuals</span><span class="op">$</span><span class="va">weight</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="https://mlfit.github.io/mlfit/reference/ml_fit.html" class="external-link">ml_fit_dss</a></span><span class="op">(</span><span class="va">m</span><span class="op">)</span><span class="op">$</span><span class="va">weights</span><span class="op">)</span>,</span>
+<span>    error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/warning.html" class="external-link">warning</a></span><span class="op">(</span><span class="va">e</span><span class="op">$</span><span class="va">message</span><span class="op">)</span></span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">PWGTP</span></span>
+<span>    <span class="op">}</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="co"># if (all(individuals$WGTP == individuals$weight)) browser()</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">type</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">d</span> <span class="op">&lt;-</span> <span class="va">target</span><span class="op">[</span><span class="va">target</span><span class="op">$</span><span class="va">Unit_Type</span> <span class="op">==</span> <span class="va">type</span>, <span class="op">]</span></span>
+<span>    <span class="va">nd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span><span class="op">[</span><span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RENTER"</span>, <span class="st">"OWNER"</span><span class="op">)</span></span>
+<span>    <span class="va">i</span> <span class="op">&lt;-</span> <span class="va">individuals</span><span class="op">[</span></span>
+<span>      <span class="va">individuals</span><span class="op">$</span><span class="va">building_type</span> <span class="op">==</span> <span class="va">type</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"weight"</span>, <span class="st">"status"</span>, <span class="va">return_vars</span><span class="op">)</span></span>
+<span>    <span class="op">]</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Reduce</a></span><span class="op">(</span><span class="st">"+"</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">i</span><span class="op">$</span><span class="va">status</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">ii</span> <span class="op">&lt;-</span> <span class="va">i</span><span class="op">[</span><span class="va">i</span><span class="op">$</span><span class="va">status</span> <span class="op">==</span> <span class="va">s</span>, <span class="op">]</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">cbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">return_vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">cat</span><span class="op">)</span> <span class="op">{</span></span>
+<span>        <span class="va">props</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">ii</span><span class="op">$</span><span class="va">weight</span>, <span class="va">ii</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span>, <span class="va">sum</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">ii</span><span class="op">$</span><span class="va">weight</span><span class="op">)</span></span>
+<span>        <span class="va">props</span><span class="op">[</span><span class="va">vars_list</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span><span class="op">[</span><span class="op">!</span><span class="va">vars_list</span><span class="op">[[</span><span class="va">cat</span><span class="op">]</span><span class="op">]</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>        <span class="va">props</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>        <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span></span>
+<span>          <span class="va">d</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">props</span>, each <span class="op">=</span> <span class="va">nd</span><span class="op">)</span>,</span>
+<span>          <span class="va">nd</span>, dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">d</span><span class="op">$</span><span class="va">OBJECTID</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">props</span><span class="op">)</span><span class="op">)</span></span>
+<span>        <span class="op">)</span></span>
+<span>      <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">}</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">estimate_parcel_grake</span> <span class="op">&lt;-</span> <span class="fu">apply_method</span><span class="op">(</span><span class="va">data</span>, <span class="va">est_grake</span><span class="op">)</span></span>
+<span><span class="va">estimate_grake_to_bg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/redistribute.html">redistribute</a></span><span class="op">(</span></span>
+<span>  <span class="va">estimate_parcel_grake</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>, <span class="va">block_groups</span>, <span class="va">map_parcel_to_bg</span>,</span>
+<span>  source_id <span class="op">=</span> <span class="st">"OBJECTID"</span>, target_id <span class="op">=</span> <span class="st">"GEOID"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level4">
+<h4 id="comparison">Comparison<a class="anchor" aria-label="anchor" href="#comparison"></a>
+</h4>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">error</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Proportional"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">var</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">estimate_parcel_to_bg</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">-</span> <span class="va">block_groups</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>, <span class="fl">0</span><span class="op">)</span>,</span>
+<span>  <span class="st">"Baseline"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">var</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">estimate_baseline_to_bg</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">-</span> <span class="va">block_groups</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>, <span class="fl">0</span><span class="op">)</span>,<span class="st">"Two Step"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">var</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">estimate_twostep_to_bg</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">-</span> <span class="va">block_groups</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>, <span class="fl">0</span><span class="op">)</span>,</span>
+<span>  <span class="st">"Generalized"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">var</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">estimate_grake_to_bg</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span> <span class="op">-</span> <span class="va">block_groups</span><span class="op">[[</span><span class="va">var</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>, <span class="fl">0</span><span class="op">)</span>,</span>
+<span>  check.names <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">error</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">error</span>, Average <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colMeans</a></span><span class="op">(</span><span class="va">error</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu">kable</span><span class="op">(</span><span class="va">error</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<thead><tr class="header">
+<th align="left"></th>
+<th align="right">Proportional</th>
+<th align="right">Baseline</th>
+<th align="right">Two Step</th>
+<th align="right">Generalized</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">sex_male</td>
+<td align="right">110.014665</td>
+<td align="right">306.294530</td>
+<td align="right">309.604262</td>
+<td align="right">335.236484</td>
+</tr>
+<tr class="even">
+<td align="left">sex_female</td>
+<td align="right">95.430592</td>
+<td align="right">306.759363</td>
+<td align="right">302.042447</td>
+<td align="right">291.209165</td>
+</tr>
+<tr class="odd">
+<td align="left">race_other</td>
+<td align="right">74.874177</td>
+<td align="right">122.017233</td>
+<td align="right">97.553985</td>
+<td align="right">124.403258</td>
+</tr>
+<tr class="even">
+<td align="left">race_white</td>
+<td align="right">143.431281</td>
+<td align="right">560.518597</td>
+<td align="right">417.160015</td>
+<td align="right">525.441673</td>
+</tr>
+<tr class="odd">
+<td align="left">race_black</td>
+<td align="right">63.190063</td>
+<td align="right">83.322952</td>
+<td align="right">74.219450</td>
+<td align="right">80.105874</td>
+</tr>
+<tr class="even">
+<td align="left">race_asian</td>
+<td align="right">54.119265</td>
+<td align="right">74.594987</td>
+<td align="right">67.876566</td>
+<td align="right">72.730593</td>
+</tr>
+<tr class="odd">
+<td align="left">race_native</td>
+<td align="right">6.032904</td>
+<td align="right">106.850492</td>
+<td align="right">5.222081</td>
+<td align="right">82.566625</td>
+</tr>
+<tr class="even">
+<td align="left">income_gt200</td>
+<td align="right">41.370969</td>
+<td align="right">436.810906</td>
+<td align="right">442.875518</td>
+<td align="right">412.456092</td>
+</tr>
+<tr class="odd">
+<td align="left">income_lt10</td>
+<td align="right">14.018293</td>
+<td align="right">17.139841</td>
+<td align="right">15.670786</td>
+<td align="right">32.980318</td>
+</tr>
+<tr class="even">
+<td align="left">income_45_50</td>
+<td align="right">7.896531</td>
+<td align="right">18.838956</td>
+<td align="right">9.331377</td>
+<td align="right">101.364135</td>
+</tr>
+<tr class="odd">
+<td align="left">income_150_200</td>
+<td align="right">31.515050</td>
+<td align="right">82.020202</td>
+<td align="right">82.020202</td>
+<td align="right">82.020202</td>
+</tr>
+<tr class="even">
+<td align="left">income_25_30</td>
+<td align="right">8.588431</td>
+<td align="right">7.989899</td>
+<td align="right">7.989899</td>
+<td align="right">7.989899</td>
+</tr>
+<tr class="odd">
+<td align="left">income_35_40</td>
+<td align="right">8.924045</td>
+<td align="right">9.095960</td>
+<td align="right">9.095960</td>
+<td align="right">9.095960</td>
+</tr>
+<tr class="even">
+<td align="left">income_15_20</td>
+<td align="right">7.873787</td>
+<td align="right">8.505050</td>
+<td align="right">8.505050</td>
+<td align="right">8.505050</td>
+</tr>
+<tr class="odd">
+<td align="left">income_125_150</td>
+<td align="right">23.852366</td>
+<td align="right">53.257576</td>
+<td align="right">53.257576</td>
+<td align="right">53.257576</td>
+</tr>
+<tr class="even">
+<td align="left">income_100_125</td>
+<td align="right">20.990281</td>
+<td align="right">51.616162</td>
+<td align="right">51.616162</td>
+<td align="right">51.616162</td>
+</tr>
+<tr class="odd">
+<td align="left">Average</td>
+<td align="right">44.507669</td>
+<td align="right">140.352044</td>
+<td align="right">122.127583</td>
+<td align="right">141.936192</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>

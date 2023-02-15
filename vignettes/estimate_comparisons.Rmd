@@ -25,7 +25,12 @@ knitr::opts_chunk$set(
 library(redistribute)
 library(sf)
 library(ggplot2)
-base_dir <- "../../estimate_comparison"
+library(knitr)
+library(readr)
+library(tidycensus)
+library(anesrake)
+base_dir <- "../estimate_comparison"
+if (!dir.exists(base_dir)) base_dir <- "../../estimate_comparison"
 ```
 
 Redistribution means rearranging values such that totals remain the same, and the original
@@ -63,14 +68,45 @@ geography_tr <- geography_tr[grep("^51013", geography_tr$GEOID), ]
 # ACS data
 
 ## block groups
-block_groups <- download_census_population(
-  base_dir, "va", 2021,
-  counties = 51013
-)$estimates
+block_groups <- tidycensus::get_acs(
+  year = 2021,
+  state = "51",
+  county = "013",
+  geography = "block group",
+  output = "wide",
+  variables = c(
+    total = "B01001_001",
+    race_white = "B02001_002",
+    race_black = "B02001_003",
+    race_native = "B02001_004",
+    race_asian = "B02001_005",
+    sex_male = "B01001_002",
+    sex_female = "B01001_026",
+    tenure_total = "B25003_001",
+    tenure_owner = "B25003_002",
+    tenure_renter = "B25003_003",
+    income_total = "B19001_001",
+    income_lt10 = "B19001_002",
+    income_10_15 = "B19001_003",
+    income_15_20 = "B19001_004",
+    income_20_25 = "B19001_005",
+    income_25_30 = "B19001_006",
+    income_30_35 = "B19001_007",
+    income_35_40 = "B19001_008",
+    income_40_45 = "B19001_009",
+    income_45_50 = "B19001_010",
+    income_100_125 = "B19001_014",
+    income_125_150 = "B19001_015",
+    income_150_200 = "B19001_016",
+    income_gt200 = "B19001_017"
+  )
+)[, -2]
 colnames(block_groups)[2] <- "Total"
-block_groups$RACE_Total_Other <- block_groups$RACE_Total - rowSums(
-  block_groups[, grep("^RACE_Total_", colnames(block_groups)), drop = TRUE]
+block_groups$race_other <- block_groups$Total - rowSums(
+  block_groups[, grep("^race_.*E$", colnames(block_groups))]
 )
+colnames(block_groups) <- sub("E$", "", colnames(block_groups))
+block_groups <- block_groups[block_groups$Total != 0, ]
 
 library(sf)
 rownames(geography_bg) <- geography_bg$GEOID
@@ -88,6 +124,7 @@ if (!file.exists(parcel_file)) {
 parcels <- readRDS(parcel_file)
 colnames(parcels)[colnames(parcels) == "Total_Units"] <- "Total"
 parcels$tract <- substring(parcels$Full_Block, 1, 11)
+parcels <- parcels[parcels$Year_Built <= 2021, ]
 ```
 
 Ultimately, we'll want to use these methods to get values for unobserved geographies,
@@ -128,7 +165,7 @@ We can see in this case, the error introduce when we only have proportional
 information at the lower level; block groups that once varied within tract
 not have the same value:
 
-```{r, fig.show="hold", out.width="50%", warning=FALSE}
+```{r, fig.show="hold", out.width="50%", warning=FALSE, echo=FALSE}
 library(ggplot2)
 library(scico)
 theme <- theme_void() %+replace%
@@ -179,15 +216,8 @@ mean(abs(estimate_parcel_to_bg$Total - block_groups$Total))
 
 Now there is more of the original variation between block groups:
 
-```{r, fig.show="hold", out.width="50%", warning=FALSE}
-map <- redistribute(
-  block_groups, estimate_tr_to_parcel,
-  return_map = TRUE
-)
-parcel_selection <- as.integer(unique(unlist(
-  lapply(map[selection], names),
-  use.names = FALSE
-)))
+```{r, fig.show="hold", out.width="50%", warning=FALSE, echo=FALSE}
+parcel_selection <- as.integer(names(map_tr_to_parcel[["51013100700"]]))
 
 ggplot(block_groups[selection, ]) +
   theme +
@@ -207,4 +237,366 @@ ggplot() +
     parcels[parcel_selection, "Total"],
     st_crs(estimate_parcel_to_bg)
   ))
+```
+
+Because the parcel totals are living units rather than individuals,
+we may be able to refine our redistribution based on some heuristic
+estimates (with some tweaking) of number of people per living unit:
+```{r}
+# start with number of units
+parcels$Residents <- parcels$Total
+
+## for parcels with more than 1 unit, assume 2.255 per unit
+su <- parcels$Total > 1
+parcels$Residents[su] <- parcels$Total[su] * 2.255
+
+## for 1-unit parcels, base on size
+su <- parcels$Total == 1
+parcels$Residents[su] <- as.numeric(cut(
+  parcels$Shape__Area[su], c(-Inf, 9170, 9550, 48000, Inf)
+)) + 4
+parcels$Residents[su & parcels$Residents > 7] <- 137.7
+
+# now see if this improved our redistribution
+estimate_tr_to_parcel <- redistribute(
+  tracts, parcels, map_tr_to_parcel,
+  weight = "Residents", source_id = "id", target_id = "OBJECTID"
+)
+estimate_parcel_to_bg <- redistribute(
+  estimate_tr_to_parcel, block_groups, map_parcel_to_bg,
+  source_id = "id", target_id = "GEOID"
+)
+
+# mean absolute error between total population estimates
+mean(abs(estimate_parcel_to_bg$Total - block_groups$Total))
+```
+
+## Estimation
+
+### PUMS Associations
+
+So far, we've used some additional information (total units) at the parcel level
+to improve the distribution of values across block groups, relative to a uniform
+distribution.
+
+We have some more information at the parcel level, such as unit type and number of
+renter versus owner residents, but to make use of this information, we need some
+association between source values and those features. This is where the census
+microdata sample can come in: the Public Use Microdata Sample (PUMS) consists of
+individual-level observations that include demographic features and housing features.
+
+```{r}
+pums <- download_census_pums(base_dir, "va", 2021)
+
+# prepare IDs
+pums$crosswalk$GEOID <- do.call(paste0, pums$crosswalk[, 1:3])
+pums$person$ID <- do.call(paste0, pums$person[, c("SERIALNO", "SPORDER")])
+
+# prepare variables
+
+## survey categories
+pums$person$sex_cat <- c("sex_male", "sex_female")[as.numeric(pums$person$SEX)]
+
+pums$person$race_cat <- paste0("race_", c(
+  "white", "black", rep("native", 3), "asian", rep("other", 3)
+))[as.numeric(pums$person$RAC1P)]
+
+income_cols <- grep("income_\\d[_0-9]+$", colnames(tracts))
+pums$household$income_cat <- as.character(cut(pums$household$HINCP, c(
+  -Inf, as.integer(gsub("^income_|_[0-9]+$", "", colnames(tracts)[income_cols])),
+  200, Inf
+), c("income_lt10", colnames(tracts)[income_cols], "income_gt200")))
+
+## unit categories
+pums$household$building_type <- "OTHER"
+pums$household$building_type[pums$household$BLD == "02"] <- "SFD"
+pums$household$building_type[pums$household$BLD == "03"] <- "SFA"
+pums$household$building_type[
+  is.na(pums$household$BLD) | pums$household$BLD %in% paste0("0", 4:9)
+] <- "MULTI"
+pums$household <- pums$household[pums$household$building_type != "OTHER", ]
+
+pums$household$status <- "OTHER"
+pums$household$status[pums$household$TEN %in% 1:2] <- "OWNER"
+pums$household$status[pums$household$TEN == 3] <- "RENTER"
+pums$household <- pums$household[pums$household$status != "OTHER", ]
+```
+
+The PUM sample is only located down to PUM areas, which are made up of tracts,
+so this is where we can start for a baseline.
+
+We will use associations between demographic and housing features within each PUMA
+to get probabilities at the parcel level, then redistribute our source values
+to them like before.
+
+The first step to this end is to prepare our data so it is easy to associate
+the individual PUMS variables with their per-level summaries at the tract level:
+
+```{r}
+# define variables of interest
+vars_house <- c(
+  ID = "SERIALNO", weight = "WGTP", type = "building_type",
+  status = "status", income = "income_cat"
+)
+vars_person <- c(
+  ID = "ID", weight = "PWGTP", sex_cat = "sex_cat", race_cat = "race_cat"
+)
+vars_units <- c(
+  type = "Unit_Type", renters = "Renter_Occupied", owners = "Owner_Occupied"
+)
+
+## get their levels
+vars_list <- c(
+  lapply(vars_person[-(1:2)], function(var) unique(pums$person[[var]])),
+  income_cat = list(unique(pums$household$income_cat))
+)
+vars <- unlist(vars_list, use.names = FALSE)
+return_vars <- names(vars_list)
+
+# prepare datasets split into PUMAs
+pumas_focal <- unique(pums$crosswalk$PUMA5CE[pums$crosswalk$GEOID %in% tracts$id])
+data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
+  households <- pums$household[pums$household$PUMA == puma, vars_house]
+  ids <- pums$crosswalk$GEOID[
+    pums$crosswalk$PUMA5CE == puma & pums$crosswalk$GEOID %in% tracts$id
+  ]
+  list(
+    households = households,
+    individuals = do.call(rbind, lapply(seq_len(nrow(households)), function(r) {
+      h <- households[r, ]
+      d <- pums$person[pums$person$SERIALNO == h$SERIALNO, vars_person]
+      cbind(h[rep(1L, nrow(d)), ], d)
+    })),
+    source = tracts[tracts$id %in% ids, c("id", vars), drop = TRUE],
+    parcels = parcels[
+      parcels$tract %in% ids, c("tract", "OBJECTID", vars_units), drop = TRUE
+    ]
+  )
+})
+
+# function to apply each method to the data
+apply_method <- function(data, method) {
+  do.call(rbind, lapply(data, function(set) {
+    do.call(rbind, lapply(unique(set$source$id), function(id) {
+      source <- set$source[set$source$id == id, -1]
+      target <- set$parcels[set$parcels$tract == id, ]
+      if (nrow(target)) {
+        est <- method(source, target[, -1], set$individuals)
+        su <- !vars %in% colnames(est)
+        if (any(su)) est[, vars[su]] <- 0
+        cbind(target[, 1:2], est[as.character(target$OBJECTID), vars])
+      }
+    }))
+  }))
+}
+```
+
+Now we can apply each method to this same set of data.
+
+### Initial Weights
+```{r, warning=FALSE}
+est_baseline <- function(source, target, individuals) {
+  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
+    d <- target[target$Unit_Type == type, ]
+    nd <- nrow(d)
+    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
+    i <- individuals[
+      individuals$building_type == type, c("PWGTP", "status", return_vars)
+    ]
+    as.data.frame(Reduce("+", lapply(unique(i$status), function(s) {
+      ii <- i[i$status == s, ]
+      do.call(cbind, lapply(return_vars, function(cat) {
+        props <- tapply(ii$PWGTP, ii[[cat]], sum) / sum(ii$PWGTP)
+        props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
+        props[is.na(props)] <- 0
+        matrix(
+          d[[s]] * rep(props, each = nd),
+          nd, dimnames = list(d$OBJECTID, names(props))
+        )
+      }))
+    })))
+  }))
+}
+estimate_parcel_baseline <- apply_method(data, est_baseline)
+estimate_baseline_to_bg <- redistribute(
+  estimate_parcel_baseline[, -1], block_groups, map_parcel_to_bg,
+  source_id = "OBJECTID", target_id = "GEOID"
+)
+```
+
+### Two Step Raking
+```{r, warning=FALSE}
+library(anesrake)
+twostep_prep <- function() {
+  eval(expression({
+    for (var in names(totals)) {
+      individuals[[var]] <- as.factor(individuals[[var]])
+      totals[[var]] <- totals[[var]][levels(individuals[[var]])]
+      su <- which(is.na(totals[[var]]) | totals[[var]] == 0)
+      if (length(su)) {
+        individuals <- individuals[!individuals[[var]] %in% names(su), ]
+        individuals[[var]] <- droplevels(individuals[[var]], exclude = names(su))
+        totals[[var]] <- totals[[var]][levels(individuals[[var]])]
+      }
+      totals[[var]] <- totals[[var]] / sum(totals[[var]])
+    }
+    totals <- Filter(length, totals)
+  }), parent.frame())
+}
+est_twostep <- function(source, target, individuals) {
+  # step 1: initial weights at household level
+  totals <- list(
+    building_type = tapply(rowSums(target[, -(1:2)]), target$Unit_Type, sum),
+    status = structure(colSums(target[, -(1:2)]), names = c("RENTER", "OWNER")),
+    income_cat = unlist(source[, grep("^income_", colnames(source))])
+  )
+  twostep_prep()
+
+  capture.output(individuals$weight <- tryCatch(
+    anesrake(
+      totals, individuals, individuals$SERIALNO, individuals$WGTP,
+      pctlim = .001
+    )$weightvec[individuals$SERIALNO],
+    error = function(e) {
+      warning(e$message)
+      individuals$WGTP
+    }
+  ))
+  
+  # step 2: adjust at person level
+  totals <- lapply(
+    structure(names(vars_list)[1:2], names = names(vars_list)[1:2]),
+    function(n) unlist(source[, vars_list[[n]]])
+  )
+  twostep_prep()
+
+  capture.output(individuals$weight <- tryCatch(
+    anesrake(
+      totals, individuals, individuals$ID,
+      individuals$PWGTP * individuals$weight / individuals$WGTP,
+      pctlim = .001
+    )$weightvec[individuals$ID],
+    error = function(e) {
+      warning(e$message)
+      individuals$PWGTP * individuals$weight / individuals$WGTP
+    }
+  ))
+
+  # calculate proportions, and estimate parcel values
+  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
+    d <- target[target$Unit_Type == type, ]
+    nd <- nrow(d)
+    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
+    i <- individuals[
+      individuals$building_type == type, c("weight", "status", return_vars)
+    ]
+    as.data.frame(Reduce("+", lapply(levels(i$status), function(s) {
+      ii <- i[i$status == s, ]
+      do.call(cbind, lapply(return_vars, function(cat) {
+        props <- tapply(ii$weight, ii[[cat]], sum) / sum(ii$weight)
+        props[is.na(props)] <- 0
+        matrix(
+          d[[s]] * rep(props, each = nd),
+          nd, dimnames = list(d$OBJECTID, names(props))
+        )
+      }))
+    })))
+  }))
+}
+estimate_parcel_twostep <- apply_method(data, est_twostep)
+estimate_twostep_to_bg <- redistribute(
+  estimate_parcel_twostep[, -1], block_groups, map_parcel_to_bg,
+  source_id = "OBJECTID", target_id = "GEOID"
+)
+```
+
+### Generalized Raking
+```{r, warning=FALSE}
+library(mlfit)
+est_grake <- function(source, target, individuals) {
+  person <- lapply(names(vars_list)[1:2], function(n) {
+    l <- vars_list[[n]]
+    s <- data.frame(level = l, count = as.numeric(source[, l]))
+    colnames(s)[1] <- n
+    s
+  })
+  household <- unique(individuals$building_type)
+  household <- structure(numeric(length(household)), names = household)
+  observed_types <- tapply(rowSums(target[, -(1:2)]), target$Unit_Type, sum)
+  household[names(observed_types)] <- observed_types
+  household <- list(data.frame(building_type = names(household), count = household))
+  household[[1]]$count[is.na(household[[1]]$count)] <- 0
+  household[[2]] <- data.frame(
+    status = c("RENTER", "OWNER"), count = colSums(target[, -(1:2)])
+  )
+  household[[3]] <- unlist(source[, grep("^income_", colnames(source))])
+  household[[3]] <- data.frame(
+    income_cat = names(household[[3]]), count = household[[3]]
+  )
+  names(household) <- c("building_type", "status", "income_cat")
+  household <- lapply(names(household), function(var) {
+    l <- household[[var]]
+    l[l[[1]] %in% unique(individuals[, var]),]
+  })
+  m <- ml_problem(
+    individuals,
+    field_names = special_field_names("SERIALNO", "ID", count = "count"),
+    group_controls = household,
+    individual_controls = person,
+    prior_weights = individuals$WGTP
+  )
+  individuals$weight <- tryCatch(
+    suppressWarnings(ml_fit_dss(m)$weights),
+    error = function(e) {
+      warning(e$message)
+      individuals$PWGTP
+    }
+  )
+  # if (all(individuals$WGTP == individuals$weight)) browser()
+  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
+    d <- target[target$Unit_Type == type, ]
+    nd <- nrow(d)
+    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
+    i <- individuals[
+      individuals$building_type == type, c("weight", "status", return_vars)
+    ]
+    as.data.frame(Reduce("+", lapply(unique(i$status), function(s) {
+      ii <- i[i$status == s, ]
+      do.call(cbind, lapply(return_vars, function(cat) {
+        props <- tapply(ii$weight, ii[[cat]], sum) / sum(ii$weight)
+        props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
+        props[is.na(props)] <- 0
+        matrix(
+          d[[s]] * rep(props, each = nd),
+          nd, dimnames = list(d$OBJECTID, names(props))
+        )
+      }))
+    })))
+  }))
+}
+estimate_parcel_grake <- apply_method(data, est_grake)
+estimate_grake_to_bg <- redistribute(
+  estimate_parcel_grake[, -1], block_groups, map_parcel_to_bg,
+  source_id = "OBJECTID", target_id = "GEOID"
+)
+```
+
+### Comparison
+```{r}
+error <- data.frame(
+  "Proportional" = vapply(vars, function(var) {
+    mean(abs(estimate_parcel_to_bg[[var]] - block_groups[[var]]))
+  }, 0),
+  "Baseline" = vapply(vars, function(var) {
+    mean(abs(estimate_baseline_to_bg[[var]] - block_groups[[var]]))
+  }, 0),"Two Step" = vapply(vars, function(var) {
+    mean(abs(estimate_twostep_to_bg[[var]] - block_groups[[var]]))
+  }, 0),
+  "Generalized" = vapply(vars, function(var) {
+    mean(abs(estimate_grake_to_bg[[var]] - block_groups[[var]]))
+  }, 0),
+  check.names = FALSE
+)
+error <- rbind(error, Average = colMeans(error))
+kable(error)
 ```

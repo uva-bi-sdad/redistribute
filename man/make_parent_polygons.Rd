@@ -4,12 +4,17 @@
 \alias{make_parent_polygons}
 \title{Make Higher-Order Polygons}
 \usage{
-make_parent_polygons(polygons, n = 3, verbose = TRUE)
+make_parent_polygons(polygons, n = 2, strict_n = TRUE, verbose = TRUE)
 }
 \arguments{
 \item{polygons}{An \code{sf} object with polygons to be reformed.}
 
 \item{n}{Number of polygons to aim to combine for each new polygon.}
+
+\item{strict_n}{Logical; if \code{TRUE} (default), \code{n} represents the number of
+intersecting polygons to select, depending on availability (with a minimum of 2).
+If \code{FALSE}, \code{n} represents the number of nearest polygons (by centroid)
+to use when calculating a box to use when selecting polygons (with a minimum of 1).}
 
 \item{verbose}{Logical; if \code{FALSE}, will not print status messages.}
 }
