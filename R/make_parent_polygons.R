@@ -3,6 +3,8 @@
 #' Randomly combine given polygons into contiguous, larger polygons.
 #'
 #' @param polygons An \code{sf} object with polygons to be reformed.
+#' @param ids A vector of IDs the same length as \code{polygons}, or the column name
+#' in \code{polygons} to use as IDs.
 #' @param n Number of polygons to aim to combine for each new polygon.
 #' @param strict_n Logical; if \code{TRUE} (default), \code{n} represents the number of
 #' intersecting polygons to select, depending on availability (with a minimum of 2).
@@ -13,11 +15,16 @@
 #' and \code{map} (a list mapping between the old and new polygon indices).
 #' @export
 
-make_parent_polygons <- function(polygons, n = 2, strict_n = TRUE, verbose = TRUE) {
+make_parent_polygons <- function(polygons, ids = NULL, n = 2, strict_n = TRUE, verbose = TRUE) {
   if (!inherits(polygons, "sf")) cli_abort("{.arg polygons} must be an sf object")
+  if (length(ids) == 1 && ids %in% colnames(polygons)) ids <- polygons[[ids]]
   polygons <- st_geometry(polygons)
   polygons <- st_cast(st_boundary(polygons), "POLYGON", do_split = FALSE)
   n_poly <- length(polygons)
+  if (!is.null(ids)) {
+    if (length(ids) != n_poly) cli_abort("{.arg ids} do not align with {.arg polygons}")
+    names(polygons) <- ids
+  }
   n <- max(if (strict_n) 2 else 1, min(n, n_poly - 1))
   sels <- seq_len(n) + 1L
   centers <- st_coordinates(suppressWarnings(st_centroid(polygons)))
@@ -84,7 +91,7 @@ make_parent_polygons <- function(polygons, n = 2, strict_n = TRUE, verbose = TRU
     sub = unlist(map, use.names = FALSE)
   )
   map <- map[!duplicated(map$sub), ]
-  map <- split(map$sub, map$super)
+  map <- split(if (is.null(ids)) map$sub else ids[map$sub], map$super)
   if (verbose) {
     cli_progress_step(
       "creating new polygons ({i}/{length(map)})",

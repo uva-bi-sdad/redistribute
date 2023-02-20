@@ -4,10 +4,14 @@
 \alias{make_parent_polygons}
 \title{Make Higher-Order Polygons}
 \usage{
-make_parent_polygons(polygons, n = 2, strict_n = TRUE, verbose = TRUE)
+make_parent_polygons(polygons, ids = NULL, n = 2, strict_n = TRUE,
+  verbose = TRUE)
 }
 \arguments{
 \item{polygons}{An \code{sf} object with polygons to be reformed.}
+
+\item{ids}{A vector of IDs the same length as \code{polygons}, or the column name
+in \code{polygons} to use as IDs.}
 
 \item{n}{Number of polygons to aim to combine for each new polygon.}
 

@@ -89,19 +89,22 @@ test_that("intersect map work", {
     }
   }
   rownames(mres) <- NULL
-  expect_identical(substring(capture.output(
+  expect_identical(sub(" \\[.*$", "", substring(capture.output(
     res <- redistribute(
       source, target,
       weight = "population", source_id = "id", target_id = "id", map = map, verbose = TRUE
     ),
     type = "message"
-  ), 3), c(
+  ), 3)), c(
     "source IDs: id column of `source`",
     "target IDs: id column of `target`",
     "map: provided list",
     "weights: population column of `target`",
-    "disaggregating 3 variables:",
-    "(numb; 3) a, b, c"
+    "redistributing 3 variables from 2 sources to 45 targets:",
+    "(numb; 3) a, b, c",
+    "disaggregating...",
+    "done disaggregating",
+    ""
   ))
   expect_equal(res[, 1:4, drop = TRUE], mres[, 1:4, drop = TRUE])
   expect_identical(redistribute(source[, -1], target, weight = "population")[, -1], res[, -1])

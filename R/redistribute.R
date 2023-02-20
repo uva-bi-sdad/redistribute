@@ -71,7 +71,7 @@
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
 #' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform
-#' @importFrom s2 s2_area
+#' @importFrom s2 s2_area s2_is_valid
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
 #' @importFrom curl curl_fetch_disk
@@ -90,8 +90,8 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
   can_intersects <- missing(make_intersect_map) || make_intersect_map
-  source_sf <- can_intersects && inherits(source, "sf")
-  target_sf <- can_intersects && inherits(target, "sf")
+  source_sf <- can_intersects && (inherits(source, "sf") || inherits(source, "sfc"))
+  target_sf <- can_intersects && (inherits(target, "sf") || inherits(target, "sfc"))
   intersect_map <- FALSE
   if (length(dim(source)) != 2) source <- t(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))
@@ -179,8 +179,13 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
         weight <- unname(target)
         tid <- names(target)
       } else {
-        if (verbose) cli_alert_info("target IDs: {.arg target} vector")
-        tid <- target
+        if (target_sf) {
+          if (verbose) cli_alert_info("target IDs: sequence")
+          tid <- seq_along(target)
+        } else {
+          if (verbose) cli_alert_info("target IDs: {.arg target} vector")
+          tid <- target
+        }
       }
     } else {
       if (can_intersects && target_sf && source_sf) {
@@ -224,9 +229,21 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     } else if (!any(sid %in% names(map))) {
       if (!any(tid %in% names(map))) cli_abort("no source or target IDs were in map names")
       mw <- unlist(unname(map))
+      if (is.null(names(mw))) mw <- structure(numeric(length(mw)) + 1, names = mw)
       onames <- names(mw)
       if (!any(sid %in% onames)) {
-        cli_abort("no source IDs were present in the ID map")
+        if (all(!grepl("[^0-9]", onames))) {
+          onames <- as.integer(onames)
+          if (min(onames) > 0 && max(onames) <= length(sid)) {
+            if (verbose) cli_alert_info("inverting map, with entry values mapped to source IDs")
+            names(mw) <- rep(names(map), vapply(map, length, 0))
+            map <- split(mw, sid[onames])
+          } else {
+            cli_abort("map appeared to refer to target indices, but they are out of range")
+          }
+        } else {
+          cli_abort("no source IDs were present in the ID map")
+        }
       } else {
         if (verbose) cli_alert_info("inverting map")
         names(mw) <- rep(names(map), vapply(map, length, 0))
@@ -319,7 +336,10 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
             su <- totals > 0
             if (any(su)) {
               part <- suppressMessages(st_intersection(reg[su], source_geom[id]))
-              w[su] <- s2_area(part) / (if (aggregate) s2_area(source_geom[[id]]) else totals[su])
+              pv <- numeric(length(part))
+              tsu <- s2_is_valid(part)
+              pv[tsu] <- s2_area(part[tsu])
+              w[su] <- pv / (if (aggregate) s2_area(source_geom[[id]]) else totals[su])
             }
           }
           names(w) <- if (is.integer(e)) tid[e] else e

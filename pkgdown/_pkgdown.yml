@@ -10,3 +10,13 @@ home:
   links:
   - text: Test Coverage
     href: coverage.html
+
+navbar:
+  components:
+    articles:
+      text: Articles
+      menu:
+      - text: Introduction
+        href: articles/introduction.html
+      - text: Method Comparisons
+        href: articles/estimate_comparisons.html

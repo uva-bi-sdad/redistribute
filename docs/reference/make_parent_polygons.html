@@ -24,8 +24,8 @@
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
-    <a class="dropdown-item" href="../articles/estimate_comparisons.html">Estimate Comparisons</a>
-    <a class="dropdown-item" href="../articles/introduction.html">Introduction to Redistribution</a>
+    <a class="dropdown-item" href="../articles/introduction.html">Introduction</a>
+    <a class="dropdown-item" href="../articles/estimate_comparisons.html">Method Comparisons</a>
   </div>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
@@ -55,13 +55,19 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">make_parent_polygons</span><span class="op">(</span><span class="va">polygons</span>, n <span class="op">=</span> <span class="fl">2</span>, strict_n <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">make_parent_polygons</span><span class="op">(</span><span class="va">polygons</span>, ids <span class="op">=</span> <span class="cn">NULL</span>, n <span class="op">=</span> <span class="fl">2</span>, strict_n <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>polygons</dt>
 <dd><p>An <code>sf</code> object with polygons to be reformed.</p></dd>
+
+
+<dt>ids</dt>
+<dd><p>A vector of IDs the same length as <code>polygons</code>, or the column name
+in <code>polygons</code> to use as IDs.</p></dd>
 
 
 <dt>n</dt>

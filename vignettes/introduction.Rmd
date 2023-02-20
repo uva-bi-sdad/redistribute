@@ -57,15 +57,14 @@ split -- in this case, one fifth of the observed value for each region:
 library(redistribute)
 
 set_value <- 1
-(redistribute(set_value, regions, verbose = TRUE))
+(redistribute(set_value, regions))
 ```
 
 Or, maybe we know a little more about the regions, such as their size; then we could use that
 information to adjust the proportion allotted to each region:
 ```{r}
 region_values <- redistribute(
-  set_value, regions,
-  weight = c(1, 10, 10, 20, 50), verbose = TRUE
+  set_value, regions, weight = c(1, 10, 10, 20, 50)
 )
 region_values
 ```
@@ -74,7 +73,7 @@ region_values
 If we have observations for all regions, we could aggregate to a single value for the set.
 In this case, we can re-aggregate what we initially disaggregated, to recover the original observation:
 ```{r}
-(redistribute(region_values, verbose = TRUE))
+(redistribute(region_values))
 ```
 
 # Applied Example
@@ -154,7 +153,7 @@ zipcodes <- read_sf(zipcode_file)
 # redistribute population data from block groups
 zipcode_population <- redistribute(
   population, zipcodes,
-  target_id = "ZIPCODE", verbose = TRUE
+  target_id = "ZIPCODE"
 )
 ```
 
@@ -175,20 +174,20 @@ parcels <- read_sf(parcel_file)
 # disaggregate population data from block groups to parcels
 bg_parcel_population <- redistribute(
   population, parcels,
-  weight = "CURRE_POPUL", verbose = TRUE
+  weight = "CURRE_POPUL"
 )
 
 # then aggregate from parcels to zip codes
 bg_parcel_zipcode_population <- redistribute(
   bg_parcel_population, zipcodes,
-  source_id = "id", target_id = "ZIPCODE", verbose = TRUE
+  source_id = "id", target_id = "ZIPCODE"
 )
 
 # since it's provided in this case, we can also just aggregate
 # up from parcels directly
 parcel_zipcode_population <- redistribute(
   parcels, zipcodes,
-  source_id = "PIN", target_id = "ZIPCODE", verbose = TRUE
+  source_id = "PIN", target_id = "ZIPCODE"
 )
 ```
 
