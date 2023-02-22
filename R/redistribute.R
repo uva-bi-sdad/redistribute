@@ -174,9 +174,13 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     target <- target[, colnames(target) != target_id, drop = FALSE]
   } else {
     if (length(dim(target)) != 2) {
-      if (is.null(weight) && is.numeric(target) && !is.null(names(target))) {
-        if (verbose) cli_alert_info("target IDs: names of {.arg target} vector; {.arg weight} set to {.arg target}")
-        weight <- unname(target)
+      if (is.null(weight) && (target_sf || is.numeric(target)) && !is.null(names(target))) {
+        if (target_sf) {
+          if (verbose) cli_alert_info("target IDs: names of {.arg target} vector")
+        } else {
+          if (verbose) cli_alert_info("target IDs: names of {.arg target} vector; {.arg weight} set to {.arg target}")
+          weight <- unname(target)
+        }
         tid <- names(target)
       } else {
         if (target_sf) {

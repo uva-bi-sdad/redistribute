@@ -190,9 +190,10 @@ Or we could go from tracts down to parcels, then back up to block groups:
 ```{r}
 # function to apply tract to parcel to block group redistribution
 redist_downup <- function(
-    top, bottom, middle, map_tb = NULL, map_bm = NULL,
-    weight = "Total", source_id = "id",
-    target_id = "OBJECTID", target_id_mid = "GEOID") {
+  top, bottom, middle, map_tb = NULL, map_bm = NULL,
+  weight = "Total", source_id = "id",
+  target_id = "OBJECTID", target_id_mid = "GEOID"
+) {
   to_bottom <- redistribute(
     top, bottom, map_tb,
     weight = weight, source_id = source_id, target_id = target_id
@@ -383,6 +384,7 @@ data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
 # function to apply each method to the data
 apply_method <- function(data, method) {
   p <- do.call(rbind, lapply(data, function(set) {
+    set$source <- st_drop_geometry(set$source)
     do.call(rbind, lapply(unique(set$source$id), function(id) {
       source <- set$source[set$source$id == id, -1]
       target <- set$parcels[if ("map" %in% names(set)) {
@@ -463,11 +465,7 @@ rake_prep <- function() {
       individuals[[var]] <- as.factor(individuals[[var]])
       totals[[var]] <- totals[[var]][levels(individuals[[var]])]
       su <- which(is.na(totals[[var]]) | totals[[var]] == 0)
-      if (length(su)) {
-        individuals <- individuals[!individuals[[var]] %in% names(su), ]
-        individuals[[var]] <- droplevels(individuals[[var]], exclude = names(su))
-        totals[[var]] <- totals[[var]][levels(individuals[[var]])]
-      }
+      if (length(su)) totals[[var]][su] <- 1
       totals[[var]] <- totals[[var]] / sum(totals[[var]])
     }
     totals <- Filter(length, totals)
@@ -479,10 +477,11 @@ est_rake <- function(source, target, individuals) {
     function(n) unlist(source[, vars_list[[n]]])
   )
   rake_prep()
+  
   individuals$status <- as.factor(individuals$status)
   individuals$building_type <- as.factor(individuals$building_type)
   individuals$income_cat <- as.factor(individuals$income_cat)
-
+  
   capture.output(individuals$weight <- tryCatch(
     anesrake(
       totals, individuals, individuals$ID, individuals$PWGTP,
@@ -493,7 +492,7 @@ est_rake <- function(source, target, individuals) {
       individuals$PWGTP
     }
   ))
-
+  
   # calculate proportions, and estimate parcel values
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
@@ -566,7 +565,6 @@ est_twostep <- function(source, target, individuals) {
       individuals$PWGTP * individuals$weight / individuals$WGTP
     }
   ))
-
   # calculate proportions, and estimate parcel values
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
@@ -605,7 +603,7 @@ library(mlfit)
 est_grake <- function(source, target, individuals) {
   person <- lapply(names(vars_list)[1:2], function(n) {
     l <- vars_list[[n]]
-    s <- data.frame(level = l, count = as.numeric(source[, l]))
+    s <- data.frame(level = l, count = as.numeric(source[, l, drop = TRUE]))
     colnames(s)[1] <- n
     s
   })
@@ -638,10 +636,19 @@ est_grake <- function(source, target, individuals) {
     suppressWarnings(ml_fit_dss(m, ginv = solve)$weights),
     error = function(e) {
       warning(e$message)
-      individuals$PWGTP
+      NULL
     }
   )
-  # if (all(individuals$WGTP == individuals$weight)) browser()
+  if (is.null(individuals$weight)) {
+    individuals$weight <- tryCatch(
+      suppressWarnings(ml_fit_ipu(m)$weights),
+      error = function(e) {
+        warning(e$message)
+        individuals$PWGTP
+      }
+    )
+  }
+  
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
     nd <- nrow(d)
@@ -686,4 +693,135 @@ error <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
 }))
 error <- rbind(error, Average = colMeans(error))
 kable(error, digits = 2)
+```
+
+### Alternate Geolayers
+
+So far, we've used the same geolayer-related test-case to assess
+our methods, but this may have an effect in itself. As an alternative,
+we might abandon canonical tracts in favor of randomly agglutinated
+block groups.
+
+```{r, warning=FALSE}
+# randomly combine adjacent block groups into pairs of 2 (were possible)
+# apply within each PUMA
+apply_altgeo <- function(run = NULL, return_full = FALSE) {
+  vdata <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
+    d <- data[[puma]]
+    su <- substring(block_groups$GEOID, 1, 11) %in% d$source$id
+    vtr <- make_parent_polygons(block_groups[su, ], "GEOID", verbose = FALSE)
+    names(vtr$new) <- names(vtr$map) <- paste0(puma, "_", seq_along(vtr$new))
+    d$geography <- vtr$new
+    d$map <- vtr$map
+    d$source <- redistribute(block_groups[su, c("GEOID", vars)], vtr$new, vtr$map)
+    d
+  })
+  
+  vsource <- do.call(rbind, lapply(vdata, "[[", "source"))
+  vmap <- redistribute(
+    vsource, parcels,
+    source_id = "id", target_id = "OBJECTID", return_map = TRUE
+  )
+  
+  vestimates <- list(
+    Prop = list(block_groups = redist_downup(
+      vsource, parcels, block_groups, vmap, map_parcel_to_bg
+    )),
+    "Prop Adj" = list(block_groups = redist_downup(
+      vsource, parcels, block_groups, vmap, map_parcel_to_bg,
+      weight = "Residents"
+    )),
+    Baseline = apply_method(vdata, est_baseline),
+    Rake = apply_method(vdata, est_rake),
+    "Rake 2 Step" = apply_method(vdata, est_twostep),
+    "Rake General" = apply_method(vdata, est_grake)
+  )
+  
+  verror <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
+    colMeans(abs(as.data.frame(
+      lapply(vestimates, function(d) d$block_groups[[var]]),
+      check.names = FALSE
+    ) - block_groups[[var]]))
+  }))
+  verror <- rbind(verror, Average = colMeans(verror))
+  
+  if (return_full) list(
+    data = data, source = vsource, map = vmap,
+    estimates = vestimates, error = verror
+  ) else verror
+}
+
+estimates_altgeo <- apply_altgeo(return_full = TRUE)
+kable(estimates_altgeo$error, digits = 2)
+```
+
+We can also take a look at the virtual tracts that were created
+in this run:
+
+```{r, echo=FALSE, fig.height=4.5, fig.width=8.1}
+library(leaflet)
+all_values <- c(block_groups$sex_male, estimates_altgeo$source$sex_male)
+pal <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
+leaflet(
+  st_transform(block_groups, "WGS84"),
+  options = leafletOptions(attributionControl = FALSE)
+) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addScaleBar("bottomleft") |>
+  addControl("Male Population", "topright") |>
+  addLayersControl(
+    position = "topleft",
+    overlayGroups = c("Block Groups", "Virtual Tracts")
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(sex_male), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Block Groups", label = ~ paste(
+      GEOID, "Male Population:", round(sex_male, 3)
+    )
+  ) |>
+  addPolygons(
+    data = st_transform(estimates_altgeo$source, "WGS84"),
+    fillColor = ~ pal(sex_male), fillOpacity = .6, weight = 2,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Virtual Tracts", label = ~ paste(
+      id, "Male Population:", round(sex_male, 3)
+    )
+  ) |>
+  addLegend("bottomright", pal, all_values, opacity = 1, title = "Male Population")
+```
+
+Since these virtual tracts are randomly created, we might also look at 
+results across a few runs for a sense of variation:
+
+```{r, warning=FALSE}
+# since this can be quite long-running,
+# we'll save and reload results
+results_altgeo_file <- paste0(base_dir, "/results_altgeo.rds")
+if (file.exists(results_altgeo_file)) {
+  results_altgeo <- readRDS(results_altgeo_file)
+} else {
+  results_altgeo <- lapply(1:50, apply_altgeo)
+  saveRDS(results_altgeo, results_altgeo_file)
+}
+
+kable(Reduce("+", results_altgeo) / length(results_altgeo), digits = 2)
+```
+
+```{r, echo=FALSE, fig.height=4.1, fig.width=8.1}
+library(splot)
+averages <- do.call(rbind, lapply(results_altgeo, function(r) r["Average",]))
+n <- nrow(averages)
+splot(
+  averages[, 1:2],
+  title = "Redistribution",
+  labx = "Mean Absolute Error", laby = "Density",
+  leg.title = "Methods", leg = "out"
+)
+splot(
+  averages[, -(1:2)], colors = splot.color()[-(1:2)],
+  title = "Estimation",
+  labx = "Mean Absolute Error", laby = "Density",
+  leg.title = "Methods", leg = "out"
+)
 ```
