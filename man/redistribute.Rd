@@ -7,9 +7,9 @@
 redistribute(source, target = NULL, map = list(), source_id = "GEOID",
   target_id = source_id, weight = NULL, source_variable = NULL,
   source_value = NULL, aggregate = NULL, weight_agg_method = "auto",
-  outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
-  overlaps = "keep", use_all = TRUE, return_geometry = TRUE,
-  return_map = FALSE, verbose = FALSE)
+  default_value = NA, outFile = NULL, overwrite = FALSE,
+  make_intersect_map = FALSE, overlaps = "keep", use_all = TRUE,
+  return_geometry = TRUE, return_map = FALSE, verbose = FALSE)
 }
 \arguments{
 \item{source}{A matrix-like object you want to distribute from; usually this will be
@@ -50,6 +50,8 @@ from \code{source} to \code{target}. Otherwise, this will be \code{TRUE} if ther
 \item{weight_agg_method}{Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
 Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
 is integer-like, and average otherwise).}
+
+\item{default_value}{Value to set to any unmapped target ID.}
 
 \item{outFile}{Path to a CSV file in which to save results.}
 

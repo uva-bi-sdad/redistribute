@@ -33,6 +33,7 @@
 #' @param weight_agg_method Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
 #' Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
 #' is integer-like, and average otherwise).
+#' @param default_value Value to set to any unmapped target ID.
 #' @param outFile Path to a CSV file in which to save results.
 #' @param overwrite Logical; if \code{TRUE}, will overwrite an existing \code{outFile}.
 #' @param make_intersect_map Logical; if \code{TRUE}, will opt to calculate an intersect-based map
@@ -70,7 +71,7 @@
 #' @importFrom RcppParallel RcppParallelLibs
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
-#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform
+#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform st_buffer
 #' @importFrom s2 s2_area s2_is_valid
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
@@ -83,9 +84,9 @@
 
 redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID",
                          target_id = source_id, weight = NULL, source_variable = NULL, source_value = NULL,
-                         aggregate = NULL, weight_agg_method = "auto", outFile = NULL, overwrite = FALSE,
-                         make_intersect_map = FALSE, overlaps = "keep", use_all = TRUE, return_geometry = TRUE,
-                         return_map = FALSE, verbose = FALSE) {
+                         aggregate = NULL, weight_agg_method = "auto", default_value = NA, outFile = NULL,
+                         overwrite = FALSE, make_intersect_map = FALSE, overlaps = "keep", use_all = TRUE,
+                         return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
@@ -339,7 +340,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
             totals <- s2_area(reg)
             su <- totals > 0
             if (any(su)) {
-              part <- suppressMessages(st_intersection(reg[su], source_geom[id]))
+              part <- suppressMessages(st_intersection(reg[su], source_geom[id], model = "closed"))
               pv <- numeric(length(part))
               tsu <- s2_is_valid(part)
               pv[tsu] <- s2_area(part[tsu])
@@ -510,6 +511,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     rownames(res) <- tid
     res <- res[otid, ]
     res$id <- otid
+    if (!is.na(default_value)) res[!res$id %in% tid, -1] <- default_value
     rownames(res) <- NULL
   }
   if (!is.null(outFile)) {

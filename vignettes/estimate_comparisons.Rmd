@@ -106,7 +106,6 @@ block_groups$race_other <- block_groups$Total - rowSums(
   block_groups[, grep("^race_.*E$", colnames(block_groups))]
 )
 colnames(block_groups) <- sub("E$", "", colnames(block_groups))
-block_groups <- block_groups[block_groups$Total != 0, ]
 
 library(sf)
 rownames(geography_bg) <- geography_bg$GEOID
@@ -190,17 +189,18 @@ Or we could go from tracts down to parcels, then back up to block groups:
 ```{r}
 # function to apply tract to parcel to block group redistribution
 redist_downup <- function(
-  top, bottom, middle, map_tb = NULL, map_bm = NULL,
-  weight = "Total", source_id = "id",
-  target_id = "OBJECTID", target_id_mid = "GEOID"
-) {
+    top, bottom, middle, map_tb = NULL, map_bm = NULL,
+    weight = "Total", source_id = "id",
+    target_id = "OBJECTID", target_id_mid = "GEOID") {
   to_bottom <- redistribute(
     top, bottom, map_tb,
-    weight = weight, source_id = source_id, target_id = target_id
+    weight = weight, source_id = source_id, target_id = target_id,
+    default_value = 0
   )
   redistribute(
     to_bottom, middle, map_bm,
-    source_id = "id", target_id = target_id_mid
+    source_id = "id", target_id = target_id_mid,
+    default_value = 0
   )
 }
 
@@ -393,6 +393,12 @@ apply_method <- function(data, method) {
         set$parcels$tract == id
       }, ]
       if (nrow(target)) {
+        # adjust resident totals to match source totals
+        vcols <- grep("Occupied", colnames(target))
+        ptotals <- rowSums(target[, vcols])
+        target[, vcols] <- target[, vcols] / ptotals *
+          (sum(source[, 1:2]) * ptotals / sum(target[, vcols]))
+
         est <- method(source, target[, -1], set$individuals)
         su <- !vars %in% colnames(est)
         if (any(su)) est[, vars[su]] <- 0
@@ -402,7 +408,7 @@ apply_method <- function(data, method) {
   }))
   list(parcels = p, block_groups = redistribute(
     p[, -1], block_groups, map_parcel_to_bg,
-    source_id = "OBJECTID", target_id = "GEOID"
+    source_id = "OBJECTID", target_id = "GEOID", default_value = 0
   ))
 }
 ```
@@ -477,11 +483,11 @@ est_rake <- function(source, target, individuals) {
     function(n) unlist(source[, vars_list[[n]]])
   )
   rake_prep()
-  
+
   individuals$status <- as.factor(individuals$status)
   individuals$building_type <- as.factor(individuals$building_type)
   individuals$income_cat <- as.factor(individuals$income_cat)
-  
+
   capture.output(individuals$weight <- tryCatch(
     anesrake(
       totals, individuals, individuals$ID, individuals$PWGTP,
@@ -492,7 +498,7 @@ est_rake <- function(source, target, individuals) {
       individuals$PWGTP
     }
   ))
-  
+
   # calculate proportions, and estimate parcel values
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
@@ -648,7 +654,7 @@ est_grake <- function(source, target, individuals) {
       }
     )
   }
-  
+
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
     nd <- nrow(d)
@@ -709,20 +715,26 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
   vdata <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
     d <- data[[puma]]
     su <- substring(block_groups$GEOID, 1, 11) %in% d$source$id
-    vtr <- make_parent_polygons(block_groups[su, ], "GEOID", verbose = FALSE)
+    vtr <- make_parent_polygons(
+      block_groups[su, ], "GEOID",
+      n_as_min = TRUE, verbose = FALSE
+    )
     names(vtr$new) <- names(vtr$map) <- paste0(puma, "_", seq_along(vtr$new))
     d$geography <- vtr$new
     d$map <- vtr$map
-    d$source <- redistribute(block_groups[su, c("GEOID", vars)], vtr$new, vtr$map)
+    d$source <- redistribute(
+      block_groups[su, c("GEOID", vars)], vtr$new, vtr$map,
+      default_value = 0
+    )
     d
   })
-  
+
   vsource <- do.call(rbind, lapply(vdata, "[[", "source"))
   vmap <- redistribute(
     vsource, parcels,
     source_id = "id", target_id = "OBJECTID", return_map = TRUE
   )
-  
+
   vestimates <- list(
     Prop = list(block_groups = redist_downup(
       vsource, parcels, block_groups, vmap, map_parcel_to_bg
@@ -736,7 +748,7 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     "Rake 2 Step" = apply_method(vdata, est_twostep),
     "Rake General" = apply_method(vdata, est_grake)
   )
-  
+
   verror <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
     colMeans(abs(as.data.frame(
       lapply(vestimates, function(d) d$block_groups[[var]]),
@@ -744,11 +756,15 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     ) - block_groups[[var]]))
   }))
   verror <- rbind(verror, Average = colMeans(verror))
-  
-  if (return_full) list(
-    data = data, source = vsource, map = vmap,
-    estimates = vestimates, error = verror
-  ) else verror
+
+  if (return_full) {
+    list(
+      data = data, source = vsource, map = vmap,
+      estimates = vestimates, error = verror
+    )
+  } else {
+    verror
+  }
 }
 
 estimates_altgeo <- apply_altgeo(return_full = TRUE)
@@ -810,7 +826,7 @@ kable(Reduce("+", results_altgeo) / length(results_altgeo), digits = 2)
 
 ```{r, echo=FALSE, fig.height=4.1, fig.width=8.1}
 library(splot)
-averages <- do.call(rbind, lapply(results_altgeo, function(r) r["Average",]))
+averages <- do.call(rbind, lapply(results_altgeo, function(r) r["Average", ]))
 n <- nrow(averages)
 splot(
   averages[, 1:2],
@@ -819,7 +835,8 @@ splot(
   leg.title = "Methods", leg = "out"
 )
 splot(
-  averages[, -(1:2)], colors = splot.color()[-(1:2)],
+  averages[, -(1:2)],
+  colors = splot.color()[-(1:2)],
   title = "Estimation",
   labx = "Mean Absolute Error", laby = "Density",
   leg.title = "Methods", leg = "out"

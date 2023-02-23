@@ -5,6 +5,7 @@
 \title{Make Higher-Order Polygons}
 \usage{
 make_parent_polygons(polygons, ids = NULL, n = 2, strict_n = TRUE,
+  n_as_min = FALSE, buffer_dist = 5e-05, min_overlap = NULL,
   verbose = TRUE)
 }
 \arguments{
@@ -19,6 +20,17 @@ in \code{polygons} to use as IDs.}
 intersecting polygons to select, depending on availability (with a minimum of 2).
 If \code{FALSE}, \code{n} represents the number of nearest polygons (by centroid)
 to use when calculating a box to use when selecting polygons (with a minimum of 1).}
+
+\item{n_as_min}{Logical; if \code{TRUE}, will merge any parents with fewer than \code{n}
+children with a random neighbor. Otherwise (and by default), parents may have fewer than \code{n}
+children. Applies if \code{strict_n} is \code{TRUE}.}
+
+\item{buffer_dist}{Distance around each initial shape or set of shapes, used to define
+neighboring shapes. Applies if \code{strict_n} is \code{TRUE}}
+
+\item{min_overlap}{Minimal area of overlap between potential neighboring shapes and
+the buffered target shape, used to define neighboring shapes.
+Applies if \code{strict_n} is \code{TRUE}}
 
 \item{verbose}{Logical; if \code{FALSE}, will not print status messages.}
 }

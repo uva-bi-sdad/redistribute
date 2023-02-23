@@ -64,7 +64,8 @@ Or, maybe we know a little more about the regions, such as their size; then we c
 information to adjust the proportion allotted to each region:
 ```{r}
 region_values <- redistribute(
-  set_value, regions, weight = c(1, 10, 10, 20, 50)
+  set_value, regions,
+  weight = c(1, 10, 10, 20, 50)
 )
 region_values
 ```

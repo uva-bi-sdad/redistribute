@@ -58,9 +58,9 @@
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">redistribute</span><span class="op">(</span><span class="va">source</span>, target <span class="op">=</span> <span class="cn">NULL</span>, map <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>, source_id <span class="op">=</span> <span class="st">"GEOID"</span>,</span>
 <span>  target_id <span class="op">=</span> <span class="va">source_id</span>, weight <span class="op">=</span> <span class="cn">NULL</span>, source_variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  source_value <span class="op">=</span> <span class="cn">NULL</span>, aggregate <span class="op">=</span> <span class="cn">NULL</span>, weight_agg_method <span class="op">=</span> <span class="st">"auto"</span>,</span>
-<span>  outFile <span class="op">=</span> <span class="cn">NULL</span>, overwrite <span class="op">=</span> <span class="cn">FALSE</span>, make_intersect_map <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  overlaps <span class="op">=</span> <span class="st">"keep"</span>, use_all <span class="op">=</span> <span class="cn">TRUE</span>, return_geometry <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  return_map <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span>  default_value <span class="op">=</span> <span class="cn">NA</span>, outFile <span class="op">=</span> <span class="cn">NULL</span>, overwrite <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  make_intersect_map <span class="op">=</span> <span class="cn">FALSE</span>, overlaps <span class="op">=</span> <span class="st">"keep"</span>, use_all <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  return_geometry <span class="op">=</span> <span class="cn">TRUE</span>, return_map <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -118,6 +118,10 @@ from <code>source</code> to <code>target</code>. Otherwise, this will be <code>T
 <dd><p>Means of aggregating <code>weight</code>, in the case that target IDs contain duplicates.
 Options are <code>"sum"</code>, <code>"average"</code>, or <code>"auto"</code> (default; which will sum if <code>weight</code>
 is integer-like, and average otherwise).</p></dd>
+
+
+<dt>default_value</dt>
+<dd><p>Value to set to any unmapped target ID.</p></dd>
 
 
 <dt>outFile</dt>
@@ -181,7 +185,7 @@ redistribution. Useful if you want to inspect an automatically created map, or u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> redistributing <span style="color: #00BB00;">2</span> variables from <span style="color: #00BB00;">1</span> source to <span style="color: #00BB00;">5</span> targets:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 2) a, b</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> done disaggregating <span style="color: #B2B2B2;">[8ms]</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> done disaggregating <span style="color: #B2B2B2;">[12ms]</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id   a   b</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 0.2 0.4</span>
@@ -205,20 +209,20 @@ redistribution. Useful if you want to inspect an automatically created map, or u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (numb; 1) num</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> (char; 1) cat</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> disaggregating...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> done disaggregating <span style="color: #B2B2B2;">[6ms]</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> done disaggregating <span style="color: #B2B2B2;">[7ms]</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> re-converting categorical levels</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    id cat num</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b1 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  a3 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  b4 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  b3 bbb 0.4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3  a2 aaa 0.2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4  a1 aaa 0.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a4 aaa 0.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a5 aaa 0.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b2 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  b4 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b5 bbb 0.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 b3 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  a5 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  a3 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  b5 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  a4 aaa 0.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  b1 bbb 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 b2 bbb 0.4</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
