@@ -167,7 +167,6 @@ library(ggplot2)
 library(scico)
 theme <- theme_void() %+replace%
   theme(text = element_text(size = 22))
-
 selection <- grep("^51013100700", block_groups$GEOID)
 ggplot(block_groups[selection, ]) +
   theme +
@@ -311,7 +310,7 @@ income_cols <- grep("income_\\d[_0-9]+$", colnames(tracts))
 pums$household$income_cat <- as.character(cut(pums$household$HINCP, c(
   -Inf, as.integer(gsub("^income_|_[0-9]+$", "", colnames(tracts)[income_cols])),
   200, Inf
-), c("income_lt10", colnames(tracts)[income_cols], "income_gt200")))
+) * 1e3, c("income_lt10", colnames(tracts)[income_cols], "income_gt200")))
 
 ## unit categories
 pums$household$building_type <- "OTHER"
@@ -483,11 +482,9 @@ est_rake <- function(source, target, individuals) {
     function(n) unlist(source[, vars_list[[n]]])
   )
   rake_prep()
-
   individuals$status <- as.factor(individuals$status)
   individuals$building_type <- as.factor(individuals$building_type)
   individuals$income_cat <- as.factor(individuals$income_cat)
-
   capture.output(individuals$weight <- tryCatch(
     anesrake(
       totals, individuals, individuals$ID, individuals$PWGTP,
@@ -498,7 +495,6 @@ est_rake <- function(source, target, individuals) {
       individuals$PWGTP
     }
   ))
-
   # calculate proportions, and estimate parcel values
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
@@ -509,8 +505,9 @@ est_rake <- function(source, target, individuals) {
     ]
     as.data.frame(Reduce("+", lapply(levels(i$status), function(s) {
       ii <- i[i$status == s, ]
+      weight_total <- sum(ii$weight)
       do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$weight, ii[[cat]], sum) / sum(ii$weight)
+        props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
         props[is.na(props)] <- 0
         matrix(
           d[[s]] * rep(props, each = nd),
@@ -541,7 +538,6 @@ est_twostep <- function(source, target, individuals) {
     income_cat = unlist(source[, grep("^income_", colnames(source))])
   )
   rake_prep()
-
   capture.output(individuals$weight <- tryCatch(
     anesrake(
       totals, individuals, individuals$SERIALNO, individuals$WGTP,
@@ -552,14 +548,12 @@ est_twostep <- function(source, target, individuals) {
       individuals$WGTP
     }
   ))
-
   # step 2: adjust at person level
   totals <- lapply(
     structure(names(vars_list)[1:2], names = names(vars_list)[1:2]),
     function(n) unlist(source[, vars_list[[n]]])
   )
   rake_prep()
-
   capture.output(individuals$weight <- tryCatch(
     anesrake(
       totals, individuals, individuals$ID,
@@ -581,8 +575,9 @@ est_twostep <- function(source, target, individuals) {
     ]
     as.data.frame(Reduce("+", lapply(levels(i$status), function(s) {
       ii <- i[i$status == s, ]
+      weight_total <- sum(ii$weight)
       do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$weight, ii[[cat]], sum) / sum(ii$weight)
+        props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
         props[is.na(props)] <- 0
         matrix(
           d[[s]] * rep(props, each = nd),
@@ -613,12 +608,13 @@ est_grake <- function(source, target, individuals) {
     colnames(s)[1] <- n
     s
   })
+  total <- sum(target[, -(1:2)])
   household <- unique(individuals$building_type)
   household <- structure(numeric(length(household)), names = household)
   observed_types <- tapply(rowSums(target[, -(1:2)]), target$Unit_Type, sum)
   household[names(observed_types)] <- observed_types
   household <- list(data.frame(building_type = names(household), count = household))
-  household[[1]]$count[is.na(household[[1]]$count)] <- 0
+  household[[1]]$count[is.na(household[[1]]$count)] <- 1
   household[[2]] <- data.frame(
     status = c("RENTER", "OWNER"), count = colSums(target[, -(1:2)])
   )
@@ -629,7 +625,9 @@ est_grake <- function(source, target, individuals) {
   names(household) <- c("building_type", "status", "income_cat")
   household <- lapply(names(household), function(var) {
     l <- household[[var]]
-    l[l[[1]] %in% unique(individuals[, var]), ]
+    l <- l[l[[1]] %in% unique(individuals[, var]), ]
+    l[[2]] <- l[[2]] / sum(l[[2]]) * total
+    l
   })
   m <- ml_problem(
     individuals,
@@ -654,7 +652,6 @@ est_grake <- function(source, target, individuals) {
       }
     )
   }
-
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
     d <- target[target$Unit_Type == type, ]
     nd <- nrow(d)
@@ -664,8 +661,9 @@ est_grake <- function(source, target, individuals) {
     ]
     as.data.frame(Reduce("+", lapply(unique(i$status), function(s) {
       ii <- i[i$status == s, ]
+      weight_total <- sum(ii$weight)
       do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$weight, ii[[cat]], sum) / sum(ii$weight)
+        props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
         props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
         props[is.na(props)] <- 0
         matrix(
@@ -701,7 +699,7 @@ error <- rbind(error, Average = colMeans(error))
 kable(error, digits = 2)
 ```
 
-### Alternate Geolayers
+## Alternate Geolayers
 
 So far, we've used the same geolayer-related test-case to assess
 our methods, but this may have an effect in itself. As an alternative,
@@ -728,13 +726,11 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     )
     d
   })
-
   vsource <- do.call(rbind, lapply(vdata, "[[", "source"))
   vmap <- redistribute(
     vsource, parcels,
     source_id = "id", target_id = "OBJECTID", return_map = TRUE
   )
-
   vestimates <- list(
     Prop = list(block_groups = redist_downup(
       vsource, parcels, block_groups, vmap, map_parcel_to_bg
@@ -748,7 +744,6 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     "Rake 2 Step" = apply_method(vdata, est_twostep),
     "Rake General" = apply_method(vdata, est_grake)
   )
-
   verror <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
     colMeans(abs(as.data.frame(
       lapply(vestimates, function(d) d$block_groups[[var]]),
@@ -756,7 +751,6 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     ) - block_groups[[var]]))
   }))
   verror <- rbind(verror, Average = colMeans(verror))
-
   if (return_full) {
     list(
       data = data, source = vsource, map = vmap,
