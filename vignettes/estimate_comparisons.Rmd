@@ -98,7 +98,10 @@ block_groups <- tidycensus::get_acs(
     income_100_125 = "B19001_014",
     income_125_150 = "B19001_015",
     income_150_200 = "B19001_016",
-    income_gt200 = "B19001_017"
+    income_gt200 = "B19001_017",
+    avg_hhsize = "B25010_001",
+    avg_hhsize_own = "B25010_002",
+    avg_hhsize_rent = "B25010_003"
   )
 )[, -2]
 colnames(block_groups)[2] <- "Total"
@@ -106,6 +109,7 @@ block_groups$race_other <- block_groups$Total - rowSums(
   block_groups[, grep("^race_.*E$", colnames(block_groups))]
 )
 colnames(block_groups) <- sub("E$", "", colnames(block_groups))
+block_groups[is.na(block_groups)] <- 0
 
 library(sf)
 rownames(geography_bg) <- geography_bg$GEOID
@@ -122,6 +126,7 @@ if (!file.exists(parcel_file)) {
 }
 parcels <- readRDS(parcel_file)
 colnames(parcels)[colnames(parcels) == "Total_Units"] <- "Total"
+parcels$OBJECTID <- as.character(parcels$OBJECTID)
 parcels$tract <- substring(parcels$Full_Block, 1, 11)
 parcels <- parcels[parcels$Year_Built <= 2021, ]
 ```
@@ -251,22 +256,17 @@ ggplot() +
 ```
 
 Because the parcel totals are living units rather than individuals,
-we may be able to refine our redistribution based on some heuristic
-estimates (with some tweaking) of number of people per living unit:
+we may be able to refine our redistribution using the average household
+size estimated in the ACS block group summaries:
+
 ```{r}
-# start with number of units
-parcels$Residents <- parcels$Total
-
-## for parcels with more than 1 unit, assume 2.255 per unit
-su <- parcels$Total > 1
-parcels$Residents[su] <- parcels$Total[su] * 2.255
-
-## for 1-unit parcels, base on size
-su <- parcels$Total == 1
-parcels$Residents[su] <- as.numeric(cut(
-  parcels$Shape__Area[su], c(-Inf, 9170, 9550, 48000, Inf)
-)) + 4
-parcels$Residents[su & parcels$Residents > 7] <- 137.7
+# multiply the number of living units in each parcel
+# by the average household size estimate in the parent block group
+parcels$Residents <- vapply(seq_len(nrow(parcels)), function(i) {
+  parcels$Total[[i]] * block_groups$avg_hhsize[
+    block_groups$GEOID == substring(parcels$Full_Block[[i]], 1, 12)
+  ]
+}, 0)
 
 # now see if this improved our redistribution
 estimate_redist_adj <- redist_downup(
@@ -355,7 +355,10 @@ vars_list <- c(
   lapply(vars_person[-(1:2)], function(var) unique(pums$person[[var]])),
   income_cat = list(unique(pums$household$income_cat))
 )
-vars <- unlist(vars_list, use.names = FALSE)
+vars <- c(
+  unlist(vars_list, use.names = FALSE),
+  "avg_hhsize_own", "avg_hhsize_rent"
+)
 return_vars <- names(vars_list)
 
 # prepare datasets split into PUMAs
@@ -393,7 +396,9 @@ apply_method <- function(data, method) {
       }, ]
       if (nrow(target)) {
         # adjust resident totals to match source totals
-        vcols <- grep("Occupied", colnames(target))
+        target$Renter_Occupied <- target$Renter_Occupied * source$avg_hhsize_rent
+        target$Owner_Occupied <- target$Owner_Occupied * source$avg_hhsize_own
+        vcols <- c("Renter_Occupied", "Owner_Occupied")
         ptotals <- rowSums(target[, vcols])
         target[, vcols] <- target[, vcols] / ptotals *
           (sum(source[, 1:2]) * ptotals / sum(target[, vcols]))
@@ -699,6 +704,29 @@ error <- rbind(error, Average = colMeans(error))
 kable(error, digits = 2)
 ```
 
+```{r, echo=FALSE}
+# save for site
+error <- do.call(cbind, lapply(structure(vars, names = vars), function(var) {
+  d <- cbind(
+    original = block_groups[[var]],
+    prop = estimate_redist[[var]],
+    prop_adj = estimate_redist_adj[[var]],
+    pums_baseline = estimate_baseline$block_groups[[var]],
+    pums_1step = estimate_rake$block_groups[[var]],
+    pums_2step = estimate_twostep$block_groups[[var]],
+    pums_general = estimate_grake$block_groups[[var]]
+  )
+  colnames(d) <- paste0(var, ".", colnames(d))
+  de <- d[, -1] - d[, 1]
+  colnames(de) <- paste0("error.", colnames(de))
+  cbind(d, de)
+}))
+error <- cbind(geoid = estimate_redist$id, as.data.frame(error))
+write.csv(error, paste0(base_dir, "/results.csv"), row.names = FALSE)
+```
+
+Full results are presented in a data site: [redistribution_arlington](https://uva-bi-sdad.github.io/redistribution_arlington)
+
 ## Alternate Geolayers
 
 So far, we've used the same geolayer-related test-case to assess
@@ -811,7 +839,7 @@ results_altgeo_file <- paste0(base_dir, "/results_altgeo.rds")
 if (file.exists(results_altgeo_file)) {
   results_altgeo <- readRDS(results_altgeo_file)
 } else {
-  results_altgeo <- lapply(1:50, apply_altgeo)
+  results_altgeo <- lapply(1:10, apply_altgeo)
   saveRDS(results_altgeo, results_altgeo_file)
 }
 
