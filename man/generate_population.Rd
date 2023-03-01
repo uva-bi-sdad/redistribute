@@ -7,7 +7,8 @@
 generate_population(N = 1000, regions = NULL, capacities = NULL,
   attraction_loci = 2, random_regions = 0.1, cost_loci = 2,
   size_loci = 2, similarity_metric = "euclidean", n_neighbors = 50,
-  neighbor_range = 0.5, n_races = 6, verbose = FALSE)
+  neighbor_range = 0.5, n_races = 6, n_building_types = 3,
+  verbose = FALSE)
 }
 \arguments{
 \item{N}{Number of initial individuals to generate. Final number of individuals will be larger.}
@@ -43,6 +44,8 @@ and \code{1} means same region only).}
 
 \item{n_races}{Number of different race groups to sample from.}
 
+\item{n_building_types}{Number of different building types to sample from.}
+
 \item{verbose}{Logical; if \code{TRUE}, will show status messages.}
 }
 \value{
@@ -55,6 +58,7 @@ A list with entries for \code{params} (with initial settings), and two
       \code{region} \tab Region ID. \cr
       \code{head_income} \tab Income of the first household member. \cr
       \code{size} \tab Number of individuals in the household. \cr
+      \code{building_type} \tab Categorical indicator of building type. \cr
       \code{renting} \tab Binary indicator of renting status. \cr
     }
   }
@@ -82,9 +86,12 @@ The population is generated in two steps:
 is determined by total distance from one or more regions selected as attraction loci. If
 coordinates are not provided, these are first randomly generated.
 
-After households are placed, household sizes and incomes (of the first member) are generated
-with their own independent spacial loci. Renting status is then generated based on income:
-60\% chance if income is under the mean income, and 40\% otherwise.
+After households are placed, household incomes (of the first member) is generated
+based on cost loci, which are then used to generate building types (where types are increasingly
+associated with income) and then household size (based on size loci, income, and building type).
+Renting status is then generated based on income and building type:
+60\% chance if income is under the mean income, and 20\% otherwise, multiplied by .8
+if the building type is of a selected renting type, or .3 otherwise.
 
 \strong{Second}, individuals are generated for each household. To generate an individual,
 first, neighbors are searched for, based on \code{n_neighbors} and \code{neighbor_range}.

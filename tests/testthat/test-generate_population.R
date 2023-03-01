@@ -4,7 +4,7 @@ test_that("loci misspecifications and verbose works", {
       2,
       attraction_loci = 3, random_regions = FALSE,
       cost_loci = 3, size_loci = 3, verbose = TRUE
-    ), type = "message"), 3),
+    ), type = "message"), 3)[1:12],
     c(
       "regions: sequence along `N`, with housing unit capacities",
       "preparing 2 households",
@@ -12,10 +12,12 @@ test_that("loci misspecifications and verbose works", {
       "calculating region similarities",
       "rescaling region similarities",
       "too many cost loci; setting `cost_loci` to 1",
+      "drawing building type and rental types",
       "too many size loci; setting `size_loci` to 1",
       "drawing renting status",
       "drawing race baserates",
-      "generating individuals"
+      "defining region neighbors",
+      "generating individuals..."
     )
   )
 })

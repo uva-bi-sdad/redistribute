@@ -9,9 +9,12 @@
 #' is determined by total distance from one or more regions selected as attraction loci. If
 #' coordinates are not provided, these are first randomly generated.
 #'
-#' After households are placed, household sizes and incomes (of the first member) are generated
-#' with their own independent spacial loci. Renting status is then generated based on income:
-#' 60\% chance if income is under the mean income, and 40\% otherwise.
+#' After households are placed, household incomes (of the first member) is generated
+#' based on cost loci, which are then used to generate building types (where types are increasingly
+#' associated with income) and then household size (based on size loci, income, and building type).
+#' Renting status is then generated based on income and building type:
+#' 60\% chance if income is under the mean income, and 20\% otherwise, multiplied by .8
+#' if the building type is of a selected renting type, or .3 otherwise.
 #'
 #' \strong{Second}, individuals are generated for each household. To generate an individual,
 #' first, neighbors are searched for, based on \code{n_neighbors} and \code{neighbor_range}.
@@ -66,6 +69,7 @@
 #' neighbors, between \code{0} and \code{1} (where \code{0} means unrestricted,
 #' and \code{1} means same region only).
 #' @param n_races Number of different race groups to sample from.
+#' @param n_building_types Number of different building types to sample from.
 #' @param verbose Logical; if \code{TRUE}, will show status messages.
 #' @examples
 #' generate_population(2)
@@ -78,6 +82,7 @@
 #'       \code{region} \tab Region ID. \cr
 #'       \code{head_income} \tab Income of the first household member. \cr
 #'       \code{size} \tab Number of individuals in the household. \cr
+#'       \code{building_type} \tab Categorical indicator of building type. \cr
 #'       \code{renting} \tab Binary indicator of renting status. \cr
 #'     }
 #'   }
@@ -98,8 +103,7 @@
 generate_population <- function(N = 1000, regions = NULL, capacities = NULL, attraction_loci = 2,
                                 random_regions = .1, cost_loci = 2, size_loci = 2,
                                 similarity_metric = "euclidean", n_neighbors = 50,
-                                neighbor_range = .5, n_races = 6, verbose = FALSE) {
-  if (inherits(regions, "sf")) regions <- st_coordinates(st_centroid(regions))
+                                neighbor_range = .5, n_races = 6, n_building_types = 3, verbose = FALSE) {
   gen_regions <- missing(regions)
   gen_capacities <- missing(capacities)
   if (gen_regions) {
@@ -125,8 +129,9 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
           "regions: specified coordinates, with capacities from {.field {capacities}} column"
         )
       }
-      capacities <- regions[, capacities, drop = TRUE]
-      regions <- regions[, colnames(regions) != capacities]
+      su <- colnames(regions) != capacities
+      capacities <- regions[[capacities]]
+      regions <- regions[, su, drop = FALSE]
     } else if (verbose) {
       cli_alert_info(paste(
         "regions: specified coordinates, with",
@@ -185,6 +190,7 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
   if (nr == 1) {
     space <- Matrix(1, dimnames = list(rids, rids), sparse = TRUE)
   } else {
+    if (inherits(regions, c("sfc", "sf"))) regions <- st_coordinates(st_centroid(regions))
     space <- lma_simets(regions, metric = similarity_metric, symmetrical = TRUE)
   }
   if (verbose) cli_alert_info("rescaling region similarities")
@@ -196,8 +202,14 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
   space_cols[selected_attraction_loci] <- -1L
   ro <- order(space %*% space_cols)
   space_cols[selected_attraction_loci] <- 0L
+  capacities <- ceiling(capacities)
+  if (sum(capacities) < N) {
+    if (verbose) cli_alert_info("{.arg N} is larger than total capacities; expanding to accomodate")
+    capacities <- ceiling(capacities / sum(capacities) * N)
+  }
   rids_expanded <- rep(ro, capacities[ro])
   region <- rids_expanded[household]
+  if (anyNA(region)) cli_abort("NAs in regions")
 
   if (N < length(rids_expanded) && is.numeric(random_regions)) {
     # redistribute a portion
@@ -226,6 +238,11 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
     rnorm(N, region_cost[region], 2e3) + (rbeta(N, .1, 1) - .6) * region_cost[region]
   ))
 
+  # selecting building type
+  if (verbose) cli_alert_info("drawing building type and rental types")
+  building_rent_boost <- if (n_building_types < 2) 1 else sample.int(n_building_types, ceiling(n_building_types * .3))
+  building_type <- if (n_building_types < 2) rep(1, nr) else sample.int(n_building_types, length(head_income), TRUE)
+
   # select household sizes
   if (!is.numeric(size_loci) || size_loci < 1) {
     size_loci <- 1
@@ -239,29 +256,45 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
   selected_size_loci <- sample.int(nr, size_loci)
   space_cols[selected_size_loci] <- 1L
   size_prob <- ((space %*% space_cols) / nr)[region, ] +
-    rbeta(N, head_income / max(head_income), 1)
+    rbeta(N, head_income / max(head_income) * building_type / max(building_type), 1)
   size <- rpois(N, 1 + size_prob * (max(size_prob) - size_prob) / 1) + 1L
 
   # selecting renting status
   if (verbose) cli_alert_info("drawing renting status")
-  renting <- rbinom(N, 1, (head_income < mean(head_income)) * .4 + .2)
+  renting <- rbinom(N, 1, ((head_income < mean(head_income)) * .2 + .4) *
+    ((building_type %in% building_rent_boost) * .3 + .5))
 
   # select race base rates
   if (verbose) cli_alert_info("drawing race baserates")
   race_rates <- rbeta(n_races, 1, 5)
   race_rates <- race_rates / (race_rates + max(race_rates))
 
-  # preparing individual data
-  if (verbose) cli_alert_info("generating individuals")
+  # making space sparse
+  if (verbose) cli_alert_info("defining region neighbors")
   space@x[space@x < neighbor_range] <- 0
   space <- drop0(space)
+
+  # preparing individual data
+  individuals <- data.frame()
+  if (verbose) {
+    cli_progress_step(
+      "generating individuals...",
+      msg_done = "generated {.field {nrow(individuals)}} individuals"
+    )
+  }
   individuals <- generate_individuals(
     region, head_income, size, renting, space, n_neighbors, race_rates
   )
 
   list(
-    params = list(neighbors = n_neighbors, range = neighbor_range, races_rates = race_rates),
-    households = data.frame(household, region = rids[region], head_income, size, renting),
+    params = list(
+      neighbors = n_neighbors, range = neighbor_range, races_rates = race_rates,
+      n_building_types = n_building_types, building_type_rent = building_rent_boost
+    ),
+    households = data.frame(
+      household,
+      region = rids[region], head_income, size, building_type, renting
+    ),
     individuals = as.data.frame(individuals)
   )
 }

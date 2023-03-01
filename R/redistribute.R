@@ -91,8 +91,8 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
   can_intersects <- missing(make_intersect_map) || make_intersect_map
-  source_sf <- can_intersects && (inherits(source, "sf") || inherits(source, "sfc"))
-  target_sf <- can_intersects && (inherits(target, "sf") || inherits(target, "sfc"))
+  source_sf <- can_intersects && inherits(source, c("sfc", "sf"))
+  target_sf <- can_intersects && inherits(target, c("sfc", "sf"))
   intersect_map <- FALSE
   if (length(dim(source)) != 2) source <- t(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))
@@ -454,7 +454,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     tid <- names(w)
     w <- unname(w)
   }
-  if (inherits(source, "sf")) st_geometry(source) <- NULL
+  if (source_sf) st_geometry(source) <- NULL
   source_numeric <- vapply(seq_len(ncol(source)), function(col) is.numeric(source[, col, drop = TRUE]), TRUE)
   if (!all(source_numeric)) {
     non_numeric <- which(!source_numeric)
