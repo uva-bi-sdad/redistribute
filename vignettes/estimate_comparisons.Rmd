@@ -127,7 +127,7 @@ if (!file.exists(parcel_file)) {
 parcels <- readRDS(parcel_file)
 colnames(parcels)[colnames(parcels) == "Total_Units"] <- "Total"
 parcels$OBJECTID <- as.character(parcels$OBJECTID)
-parcels$tract <- substring(parcels$Full_Block, 1, 11)
+parcels$geoid <- substring(parcels$Full_Block, 1, 12)
 parcels <- parcels[parcels$Year_Built <= 2021, ]
 ```
 
@@ -264,7 +264,7 @@ size estimated in the ACS block group summaries:
 # by the average household size estimate in the parent block group
 parcels$Residents <- vapply(seq_len(nrow(parcels)), function(i) {
   parcels$Total[[i]] * block_groups$avg_hhsize[
-    block_groups$GEOID == substring(parcels$Full_Block[[i]], 1, 12)
+    block_groups$GEOID == parcels$geoid[[i]]
   ]
 }, 0)
 
@@ -369,7 +369,6 @@ data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
     pums$crosswalk$PUMA5CE == puma & pums$crosswalk$GEOID %in% tracts$id
   ]
   list(
-    households = households,
     individuals = do.call(rbind, lapply(seq_len(nrow(households)), function(r) {
       h <- households[r, ]
       d <- pums$person[pums$person$SERIALNO == h$SERIALNO, vars_person]
@@ -377,43 +376,52 @@ data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
     })),
     source = tracts[tracts$id %in% ids, c("id", vars), drop = TRUE],
     parcels = parcels[
-      parcels$tract %in% ids, c("tract", "OBJECTID", vars_units),
+      substring(parcels$geoid, 1, 11) %in% ids, c("geoid", "OBJECTID", vars_units),
       drop = TRUE
     ]
   )
 })
 
 # function to apply each method to the data
-apply_method <- function(data, method) {
+apply_method <- function(data, method, parcel_only = FALSE) {
   p <- do.call(rbind, lapply(data, function(set) {
     set$source <- st_drop_geometry(set$source)
     do.call(rbind, lapply(unique(set$source$id), function(id) {
       source <- set$source[set$source$id == id, -1]
       target <- set$parcels[if ("map" %in% names(set)) {
-        set$parcels$tract %in% substring(set$map[[id]], 1, 11)
+        if ("geography" %in% names(set)) {
+          set$parcels$geoid %in% set$map[[id]]
+        } else {
+          set$parcels$geoid == id
+        }
       } else {
-        set$parcels$tract == id
+        substring(set$parcels$geoid, 1, 11) == id
       }, ]
       if (nrow(target)) {
-        # adjust resident totals to match source totals
         target$Renter_Occupied <- target$Renter_Occupied * source$avg_hhsize_rent
         target$Owner_Occupied <- target$Owner_Occupied * source$avg_hhsize_own
-        vcols <- c("Renter_Occupied", "Owner_Occupied")
-        ptotals <- rowSums(target[, vcols])
-        target[, vcols] <- target[, vcols] / ptotals *
-          (sum(source[, 1:2]) * ptotals / sum(target[, vcols]))
 
         est <- method(source, target[, -1], set$individuals)
+        totals <- colSums(est)
+        totals[!totals] <- 1
+        est <- sweep(est, 2, totals, "/") * rep(
+          as.numeric(source[, colnames(est)]),
+          each = nrow(est)
+        )
         su <- !vars %in% colnames(est)
         if (any(su)) est[, vars[su]] <- 0
         cbind(target[, 1:2], est[as.character(target$OBJECTID), vars])
       }
     }))
   }))
-  list(parcels = p, block_groups = redistribute(
-    p[, -1], block_groups, map_parcel_to_bg,
-    source_id = "OBJECTID", target_id = "GEOID", default_value = 0
-  ))
+  if (parcel_only) {
+    p
+  } else {
+    list(parcels = p, block_groups = redistribute(
+      p[, -1], block_groups, map_parcel_to_bg,
+      source_id = "OBJECTID", target_id = "GEOID", default_value = 0
+    ))
+  }
 }
 ```
 
@@ -701,7 +709,7 @@ error <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
   colMeans(abs(d - block_groups[[var]]))
 }))
 error <- rbind(error, Average = colMeans(error))
-kable(error, digits = 2)
+kable(error, digits = 3)
 ```
 
 ```{r, echo=FALSE}
@@ -790,13 +798,13 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
 }
 
 estimates_altgeo <- apply_altgeo(return_full = TRUE)
-kable(estimates_altgeo$error, digits = 2)
+kable(estimates_altgeo$error, digits = 3)
 ```
 
 We can also take a look at the virtual tracts that were created
 in this run:
 
-```{r, echo=FALSE, fig.height=4.5, fig.width=8.1}
+```{r, echo=FALSE, fig.height=4, fig.width=8.1}
 library(leaflet)
 all_values <- c(block_groups$sex_male, estimates_altgeo$source$sex_male)
 pal <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
@@ -839,28 +847,21 @@ results_altgeo_file <- paste0(base_dir, "/results_altgeo.rds")
 if (file.exists(results_altgeo_file)) {
   results_altgeo <- readRDS(results_altgeo_file)
 } else {
-  results_altgeo <- lapply(1:10, apply_altgeo)
+  results_altgeo <- lapply(1:50, apply_altgeo)
   saveRDS(results_altgeo, results_altgeo_file)
 }
 
-kable(Reduce("+", results_altgeo) / length(results_altgeo), digits = 2)
+kable(Reduce("+", results_altgeo) / length(results_altgeo), digits = 3)
 ```
 
 ```{r, echo=FALSE, fig.height=4.1, fig.width=8.1}
 library(splot)
-averages <- do.call(rbind, lapply(results_altgeo, function(r) r["Average", ]))
-n <- nrow(averages)
-splot(
-  averages[, 1:2],
-  title = "Redistribution",
-  labx = "Mean Absolute Error", laby = "Density",
-  leg.title = "Methods", leg = "out"
-)
-splot(
-  averages[, -(1:2)],
-  colors = splot.color()[-(1:2)],
-  title = "Estimation",
-  labx = "Mean Absolute Error", laby = "Density",
-  leg.title = "Methods", leg = "out"
-)
+for (var in c("race_native", "income_15_20", "income_gt200", "Average")) {
+  dist <- do.call(rbind, lapply(results_altgeo, function(r) r[var, ]))
+  splot(
+    dist,
+    title = var, labx = "Mean Absolute Error", laby = "Density",
+    leg.title = "Methods", leg = "out"
+  )
+}
 ```
