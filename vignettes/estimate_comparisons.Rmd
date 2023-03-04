@@ -423,6 +423,36 @@ apply_method <- function(data, method, parcel_only = FALSE) {
     ))
   }
 }
+
+# function to calculate estimates from weights
+make_estimates <- function() {
+  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
+    d <- target[target$Unit_Type == type, ]
+    nd <- nrow(d)
+    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
+    i <- individuals[
+      individuals$building_type == type, c("weight", "status", return_vars)
+    ]
+    as.data.frame(Reduce("+", lapply(
+      (if (is.factor(i$status)) levels else unique)(i$status),
+      function(s) {
+        ii <- i[i$status == s, ]
+        weight_total <- sum(ii$weight)
+        do.call(cbind, lapply(return_vars, function(cat) {
+          props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
+          props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
+          props[is.na(props)] <- 0
+          props <- props[vars_list[[cat]]]
+          matrix(
+            d[[s]] * rep(props, each = nd),
+            nd,
+            dimnames = list(d$OBJECTID, names(props))
+          )
+        }))
+      }
+    )))
+  }))
+}
 ```
 
 Now we can apply each method to this same set of data.
@@ -438,28 +468,9 @@ then apply that to the parcels in each contained tract:
 # - target: the parcels
 # - individuals: the individual PUM responses
 est_baseline <- function(source, target, individuals) {
-  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
-    d <- target[target$Unit_Type == type, ]
-    nd <- nrow(d)
-    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
-    i <- individuals[
-      individuals$building_type == type, c("PWGTP", "status", return_vars)
-    ]
-    as.data.frame(Reduce("+", lapply(unique(i$status), function(s) {
-      ii <- i[i$status == s, ]
-      weight_total <- sum(ii$PWGTP)
-      do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$PWGTP, ii[[cat]], sum) / weight_total
-        props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
-        props[is.na(props)] <- 0
-        matrix(
-          d[[s]] * rep(props, each = nd),
-          nd,
-          dimnames = list(d$OBJECTID, names(props))
-        )
-      }))
-    })))
-  }))
+  individuals$weight <- individuals$PWGTP
+  environment(make_estimates) <- environment()
+  make_estimates()
 }
 
 # apply across PUMAs and tracts within them
@@ -508,28 +519,8 @@ est_rake <- function(source, target, individuals) {
       individuals$PWGTP
     }
   ))
-  # calculate proportions, and estimate parcel values
-  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
-    d <- target[target$Unit_Type == type, ]
-    nd <- nrow(d)
-    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
-    i <- individuals[
-      individuals$building_type == type, c("weight", "status", return_vars)
-    ]
-    as.data.frame(Reduce("+", lapply(levels(i$status), function(s) {
-      ii <- i[i$status == s, ]
-      weight_total <- sum(ii$weight)
-      do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
-        props[is.na(props)] <- 0
-        matrix(
-          d[[s]] * rep(props, each = nd),
-          nd,
-          dimnames = list(d$OBJECTID, names(props))
-        )
-      }))
-    })))
-  }))
+  environment(make_estimates) <- environment()
+  make_estimates()
 }
 estimate_rake <- apply_method(data, est_rake)
 ```
@@ -578,28 +569,8 @@ est_twostep <- function(source, target, individuals) {
       individuals$PWGTP * individuals$weight / individuals$WGTP
     }
   ))
-  # calculate proportions, and estimate parcel values
-  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
-    d <- target[target$Unit_Type == type, ]
-    nd <- nrow(d)
-    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
-    i <- individuals[
-      individuals$building_type == type, c("weight", "status", return_vars)
-    ]
-    as.data.frame(Reduce("+", lapply(levels(i$status), function(s) {
-      ii <- i[i$status == s, ]
-      weight_total <- sum(ii$weight)
-      do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
-        props[is.na(props)] <- 0
-        matrix(
-          d[[s]] * rep(props, each = nd),
-          nd,
-          dimnames = list(d$OBJECTID, names(props))
-        )
-      }))
-    })))
-  }))
+  environment(make_estimates) <- environment()
+  make_estimates()
 }
 estimate_twostep <- apply_method(data, est_twostep)
 ```
@@ -615,13 +586,19 @@ weights at the same time with a generalized raking approach:
 ```{r, warning=FALSE}
 library(mlfit)
 est_grake <- function(source, target, individuals) {
+  totals <- list(
+    person = sum(individuals$PWGTP),
+    household = sum(individuals$WGTP[!duplicated(individuals$SERIALNO)])
+  )
   person <- lapply(names(vars_list)[1:2], function(n) {
     l <- vars_list[[n]]
-    s <- data.frame(level = l, count = as.numeric(source[, l, drop = TRUE]))
+    count <- as.numeric(source[, l, drop = TRUE])
+    count[!count] <- 1
+    count <- count / sum(count) * totals$person
+    s <- data.frame(level = l, count = count)
     colnames(s)[1] <- n
     s
   })
-  total <- sum(target[, -(1:2)])
   household <- unique(individuals$building_type)
   household <- structure(numeric(length(household)), names = household)
   observed_types <- tapply(rowSums(target[, -(1:2)]), target$Unit_Type, sum)
@@ -639,7 +616,8 @@ est_grake <- function(source, target, individuals) {
   household <- lapply(names(household), function(var) {
     l <- household[[var]]
     l <- l[l[[1]] %in% unique(individuals[, var]), ]
-    l[[2]] <- l[[2]] / sum(l[[2]]) * total
+    l[[2]][!l[[2]]] <- 1
+    l[[2]] <- l[[2]] / sum(l[[2]]) * totals$household
     l
   })
   m <- ml_problem(
@@ -650,7 +628,7 @@ est_grake <- function(source, target, individuals) {
     prior_weights = individuals$WGTP
   )
   individuals$weight <- tryCatch(
-    suppressWarnings(ml_fit_dss(m, ginv = solve)$weights),
+    suppressWarnings(ml_fit_hipf(m)$weights),
     error = function(e) {
       warning(e$message)
       NULL
@@ -658,35 +636,15 @@ est_grake <- function(source, target, individuals) {
   )
   if (is.null(individuals$weight)) {
     individuals$weight <- tryCatch(
-      suppressWarnings(ml_fit_ipu(m)$weights),
+      suppressWarnings(ml_fit_dss(m)$weights),
       error = function(e) {
         warning(e$message)
         individuals$PWGTP
       }
     )
   }
-  do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
-    d <- target[target$Unit_Type == type, ]
-    nd <- nrow(d)
-    colnames(d)[-(1:2)] <- c("RENTER", "OWNER")
-    i <- individuals[
-      individuals$building_type == type, c("weight", "status", return_vars)
-    ]
-    as.data.frame(Reduce("+", lapply(unique(i$status), function(s) {
-      ii <- i[i$status == s, ]
-      weight_total <- sum(ii$weight)
-      do.call(cbind, lapply(return_vars, function(cat) {
-        props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
-        props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
-        props[is.na(props)] <- 0
-        matrix(
-          d[[s]] * rep(props, each = nd),
-          nd,
-          dimnames = list(d$OBJECTID, names(props))
-        )
-      }))
-    })))
-  }))
+  environment(make_estimates) <- environment()
+  make_estimates()
 }
 estimate_grake <- apply_method(data, est_grake)
 ```
@@ -730,7 +688,7 @@ error <- do.call(cbind, lapply(structure(vars, names = vars), function(var) {
   cbind(d, de)
 }))
 error <- cbind(geoid = estimate_redist$id, as.data.frame(error))
-write.csv(error, paste0(base_dir, "/results.csv"), row.names = FALSE)
+write.csv(error, paste0(base_dir, "/results_tract.csv"), row.names = FALSE)
 ```
 
 Full results are presented in a data site: [redistribution_arlington](https://uva-bi-sdad.github.io/redistribution_arlington)
