@@ -93,6 +93,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   can_intersects <- missing(make_intersect_map) || make_intersect_map
   source_sf <- can_intersects && inherits(source, c("sfc", "sf"))
   target_sf <- can_intersects && inherits(target, c("sfc", "sf"))
+  can_intersects <- source_sf && target_sf
   intersect_map <- FALSE
   if (length(dim(source)) != 2) source <- t(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))
@@ -193,7 +194,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
         }
       }
     } else {
-      if (can_intersects && target_sf && source_sf) {
+      if (can_intersects) {
         if (verbose) cli_alert_info("target IDs: sequence, assuming map from geometries")
         intersect_map <- TRUE
         tid <- seq_len(nrow(target))
@@ -270,10 +271,11 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       intersect_map <- FALSE
       map <- as.list(structure(substr(sid, 1, nchar(tid[1])), names = sid))
     } else if (!intersect_map && all(nchar(sid) == nchar(sid[1])) && nchar(tid[1]) > nchar(sid[1]) &&
-      any(substring(tid, 1, nchar(sid[1])) %in% sid)) {
+      any(substring(tid, 1, nchar(sid[1])) %in% sid) &&
+      (!can_intersects || !all(substring(tid, 1, nchar(sid[1])) == substring(tid[1], 1, nchar(sid[1]))))) {
       if (verbose) cli_alert_info("map: first {.field {nchar(sid[1])}} character{?s} of target IDs")
       map <- split(tid, substr(tid, 1, nchar(sid[1])))
-    } else if (can_intersects && source_sf && target_sf) {
+    } else if (can_intersects) {
       if (verbose) {
         cli_alert_info("map: intersections between geometries")
         cli_progress_step("mapping...", msg_done = "done mapping")
@@ -405,7 +407,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     if (verbose) cli_alert_info("returning map")
     return(map)
   }
-  mtid <- unlist(lapply(map, names), use.names = FALSE)
+  mtid <- names(unlist(unname(map)))
   nout <- length(if (aggregate) sid else tid)
   w <- if (length(weight) > 1) {
     if (verbose) cli_alert_info("weights: {.arg weight} vector")

@@ -183,10 +183,12 @@ NumericVector process_distribute(
         const CharacterVector tids = tidws.names();
         for (t = 0; t < n; t++) {
           const String id = tids[t];
-          const double itw = tidws[t];
-          imap.at(id).push_back(i);
-          wmap.at(id).push_back(itw);
-          if (balance) tmap.at(id) += itw;
+          if (imap.find(id) != imap.end()) {
+            const double itw = tidws[t];
+            imap.at(id).push_back(i);
+            wmap.at(id).push_back(itw);
+            if (balance) tmap.at(id) += itw;
+          }
         }
       }
     }
