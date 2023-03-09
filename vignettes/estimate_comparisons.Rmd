@@ -111,6 +111,16 @@ block_groups$race_other <- block_groups$Total - rowSums(
 colnames(block_groups) <- sub("E$", "", colnames(block_groups))
 block_groups[is.na(block_groups)] <- 0
 
+### make larger income groups
+income_vars <- grep("income", colnames(block_groups), value = TRUE)
+block_groups$income_lt50 <- rowSums(
+  block_groups[, grep("_(?:lt|[1-5]{2}_).*\\d$", income_vars)]
+)
+block_groups$income_100_200 <- rowSums(
+  block_groups[, grep("_1\\d{2}.*\\d$", income_vars)]
+)
+income_vars_select <- c("income_lt50", "income_100_200", "income_gt200")
+
 library(sf)
 rownames(geography_bg) <- geography_bg$GEOID
 st_geometry(block_groups) <- st_geometry(geography_bg[block_groups$GEOID, ])
@@ -233,7 +243,7 @@ mean(abs(estimate_redist$Total - block_groups$Total))
 Now there is more of the original variation between block groups:
 
 ```{r, fig.show="hold", out.width="50%", warning=FALSE, echo=FALSE}
-parcel_selection <- as.integer(names(map_tr_to_parcel[["51013100700"]]))
+parcel_selection <- names(map_tr_to_parcel[["51013100700"]])
 
 ggplot(block_groups[selection, ]) +
   theme +
@@ -250,7 +260,7 @@ ggplot() +
     estimate_redist[selection, "Total"]
   ) +
   geom_sf(aes(fill = Total), st_transform(
-    parcels[parcel_selection, "Total"],
+    parcels[parcels$OBJECTID %in% parcel_selection, "Total"],
     st_crs(estimate_redist)
   ))
 ```
@@ -306,11 +316,9 @@ pums$person$race_cat <- paste0("race_", c(
   "white", "black", rep("native", 3), "asian", rep("other", 3)
 ))[as.numeric(pums$person$RAC1P)]
 
-income_cols <- grep("income_\\d[_0-9]+$", colnames(tracts))
-pums$household$income_cat <- as.character(cut(pums$household$HINCP, c(
-  -Inf, as.integer(gsub("^income_|_[0-9]+$", "", colnames(tracts)[income_cols])),
-  200, Inf
-) * 1e3, c("income_lt10", colnames(tracts)[income_cols], "income_gt200")))
+pums$household$income_cat <- as.character(cut(
+  pums$household$HINCP, c(-Inf, 50, 200, Inf) * 1e3, income_vars_select
+))
 
 ## unit categories
 pums$household$building_type <- "OTHER"
@@ -383,7 +391,7 @@ data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
 })
 
 # function to apply each method to the data
-apply_method <- function(data, method, parcel_only = FALSE) {
+apply_method <- function(data, method, parcel_only = FALSE, rescale = TRUE) {
   p <- do.call(rbind, lapply(data, function(set) {
     set$source <- st_drop_geometry(set$source)
     do.call(rbind, lapply(unique(set$source$id), function(id) {
@@ -402,12 +410,14 @@ apply_method <- function(data, method, parcel_only = FALSE) {
         target$Owner_Occupied <- target$Owner_Occupied * source$avg_hhsize_own
 
         est <- method(source, target[, -1], set$individuals)
-        totals <- colSums(est)
-        totals[!totals] <- 1
-        est <- sweep(est, 2, totals, "/") * rep(
-          as.numeric(source[, colnames(est)]),
-          each = nrow(est)
-        )
+        if (rescale) {
+          totals <- colSums(est)
+          totals[!totals] <- 1
+          est <- sweep(est, 2, totals, "/") * rep(
+            as.numeric(source[, colnames(est)]),
+            each = nrow(est)
+          )
+        }
         su <- !vars %in% colnames(est)
         if (any(su)) est[, vars[su]] <- 0
         cbind(target[, 1:2], est[as.character(target$OBJECTID), vars])
@@ -494,7 +504,7 @@ rake_prep <- function() {
       individuals[[var]] <- as.factor(individuals[[var]])
       totals[[var]] <- totals[[var]][levels(individuals[[var]])]
       su <- which(is.na(totals[[var]]) | totals[[var]] == 0)
-      if (length(su)) totals[[var]][su] <- 1
+      if (length(su)) totals[[var]] <- totals[[var]][!su]
       totals[[var]] <- totals[[var]] / sum(totals[[var]])
     }
     totals <- Filter(length, totals)
@@ -604,7 +614,7 @@ est_grake <- function(source, target, individuals) {
   observed_types <- tapply(rowSums(target[, -(1:2)]), target$Unit_Type, sum)
   household[names(observed_types)] <- observed_types
   household <- list(data.frame(building_type = names(household), count = household))
-  household[[1]]$count[is.na(household[[1]]$count)] <- 1
+  household[[1]]$count[is.na(household[[1]]$count)] <- 0
   household[[2]] <- data.frame(
     status = c("RENTER", "OWNER"), count = colSums(target[, -(1:2)])
   )
@@ -616,7 +626,7 @@ est_grake <- function(source, target, individuals) {
   household <- lapply(names(household), function(var) {
     l <- household[[var]]
     l <- l[l[[1]] %in% unique(individuals[, var]), ]
-    l[[2]][!l[[2]]] <- 1
+    l[[2]][!l[[2]]] <- 0
     l[[2]] <- l[[2]] / sum(l[[2]]) * totals$household
     l
   })
@@ -684,8 +694,10 @@ error <- do.call(cbind, lapply(structure(vars, names = vars), function(var) {
   )
   colnames(d) <- paste0(var, ".", colnames(d))
   de <- d[, -1] - d[, 1]
+  dea <- abs(de)
+  colnames(dea) <- paste0("abs.error.", colnames(de))
   colnames(de) <- paste0("error.", colnames(de))
-  cbind(d, de)
+  cbind(d, de, dea)
 }))
 error <- cbind(geoid = estimate_redist$id, as.data.frame(error))
 write.csv(error, paste0(base_dir, "/results_tract.csv"), row.names = FALSE)
@@ -814,7 +826,7 @@ kable(Reduce("+", results_altgeo) / length(results_altgeo), digits = 3)
 
 ```{r, echo=FALSE, fig.height=4.1, fig.width=8.1}
 library(splot)
-for (var in c("race_native", "income_15_20", "income_gt200", "Average")) {
+for (var in c("race_white", "race_native", "income_100_200", "Average")) {
   dist <- do.call(rbind, lapply(results_altgeo, function(r) r[var, ]))
   splot(
     dist,
