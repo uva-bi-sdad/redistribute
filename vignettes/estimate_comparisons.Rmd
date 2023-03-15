@@ -95,6 +95,9 @@ block_groups <- tidycensus::get_acs(
     income_35_40 = "B19001_008",
     income_40_45 = "B19001_009",
     income_45_50 = "B19001_010",
+    income_50_60 = "B19001_011",
+    income_60_75 = "B19001_012",
+    income_75_100 = "B19001_013",
     income_100_125 = "B19001_014",
     income_125_150 = "B19001_015",
     income_150_200 = "B19001_016",
@@ -116,10 +119,13 @@ income_vars <- grep("income", colnames(block_groups), value = TRUE)
 block_groups$income_lt50 <- rowSums(
   block_groups[, grep("_(?:lt|[1-5]{2}_).*\\d$", income_vars)]
 )
+block_groups$income_50_100 <- rowSums(
+  block_groups[, grep("income_[5-7].*\\d$", income_vars)]
+)
 block_groups$income_100_200 <- rowSums(
   block_groups[, grep("_1\\d{2}.*\\d$", income_vars)]
 )
-income_vars_select <- c("income_lt50", "income_100_200", "income_gt200")
+income_vars_select <- c("income_lt50", "income_50_100", "income_100_200", "income_gt200")
 
 library(sf)
 rownames(geography_bg) <- geography_bg$GEOID
@@ -317,7 +323,7 @@ pums$person$race_cat <- paste0("race_", c(
 ))[as.numeric(pums$person$RAC1P)]
 
 pums$household$income_cat <- as.character(cut(
-  pums$household$HINCP, c(-Inf, 50, 200, Inf) * 1e3, income_vars_select
+  pums$household$HINCP, c(-Inf, 50, 100, 200, Inf) * 1e3, income_vars_select
 ))
 
 ## unit categories
