@@ -5,10 +5,10 @@
 \title{Generate a Population}
 \usage{
 generate_population(N = 1000, regions = NULL, capacities = NULL,
-  attraction_loci = 2, random_regions = 0.1, cost_loci = 2,
-  size_loci = 2, similarity_metric = "euclidean", n_neighbors = 50,
-  neighbor_range = 0.5, n_races = 6, n_building_types = 3,
-  verbose = FALSE)
+  region_ids = NULL, attraction_loci = 3, random_regions = 0.1,
+  cost_loci = 2, size_loci = 2, similarity_metric = "euclidean",
+  n_neighbors = 50, neighbor_range = 0.5, n_races = 6,
+  n_building_types = 3, verbose = FALSE)
 }
 \arguments{
 \item{N}{Number of initial individuals to generate. Final number of individuals will be larger.}
@@ -19,6 +19,9 @@ geometries from which coordinates can be derived. If not specified
 single and multi-family locations) will be generated.}
 
 \item{capacities}{A vector with the maximum number of households for each entry in \code{regions}.}
+
+\item{region_ids}{A vector of unique IDs for each \code{regions}, or a column name in
+\code{regions} containing IDs.}
 
 \item{attraction_loci}{Number of locations selected to be centers of attractiveness,
 which influence where households are located.}

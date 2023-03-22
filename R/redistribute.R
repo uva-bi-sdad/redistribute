@@ -379,10 +379,11 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       e
     })
   }
+  targets <- unlist(unname(map))
+  if (!any_partial) any_partial <- anyDuplicated(names(targets))
   if (dodedupe && any_partial) {
     if (verbose) cli_alert_info("assigning each target to a single source")
     any_partial <- FALSE
-    targets <- unlist(unname(map))
     esids <- factor(rep(sid, vapply(map, length, 0)), unique(sid))
     if (anyDuplicated(names(targets))) {
       for (ct in unique(names(targets))) {

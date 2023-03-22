@@ -53,6 +53,8 @@
 #' (and \code{capacities} is not specified), regions similar to housing units (with a mix of
 #' single and multi-family locations) will be generated.
 #' @param capacities A vector with the maximum number of households for each entry in \code{regions}.
+#' @param region_ids A vector of unique IDs for each \code{regions}, or a column name in
+#' \code{regions} containing IDs.
 #' @param attraction_loci Number of locations selected to be centers of attractiveness,
 #' which influence where households are located.
 #' @param random_regions A number between \code{0} and \code{1}, which determines the proportion of
@@ -100,8 +102,8 @@
 #' }
 #' @export
 
-generate_population <- function(N = 1000, regions = NULL, capacities = NULL, attraction_loci = 2,
-                                random_regions = .1, cost_loci = 2, size_loci = 2,
+generate_population <- function(N = 1000, regions = NULL, capacities = NULL, region_ids = NULL,
+                                attraction_loci = 3, random_regions = .1, cost_loci = 2, size_loci = 2,
                                 similarity_metric = "euclidean", n_neighbors = 50,
                                 neighbor_range = .5, n_races = 6, n_building_types = 3, verbose = FALSE) {
   gen_regions <- missing(regions)
@@ -122,6 +124,16 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
       regions <- seq_along(capacities)
     }
   }
+  if (!missing(region_ids)) {
+    if (length(region_ids) == 1 && region_ids %in% colnames(regions)) {
+      su <- colnames(regions) != region_ids
+      region_ids <- regions[[region_ids]]
+      regions <- regions[, su, drop = FALSE]
+    } else {
+      nr <- if (length(dim(regions)) == 2) nrow(regions) else length(regions)
+      if (region_ids != nr) cli_abort("{.arg region_ids} are not the same length as {.arg regions}")
+    }
+  }
   if (length(dim(regions)) == 2) {
     if (length(capacities) == 1 && is.character(capacities) && capacities %in% colnames(regions)) {
       if (verbose) {
@@ -138,7 +150,13 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
         if (gen_capacities) "{.field N / nrow(regions)}" else "specified", "capacities"
       ))
     }
-    rids <- if (is.null(rownames(regions))) seq_len(nrow(regions)) else rownames(regions)
+    rids <- if (length(region_ids)) {
+      region_ids
+    } else if (is.null(rownames(regions))) {
+      paste0("r", seq_len(nrow(regions)))
+    } else {
+      rownames(regions)
+    }
   } else {
     rids <- if (length(regions) == 1 && is.numeric(regions)) {
       if (verbose) {
@@ -147,18 +165,18 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
           if (gen_capacities) "{.field N / nrow(regions)}" else "specified", "capacities"
         ))
       }
-      as.character(seq_len(regions))
+      if (length(region_ids)) region_ids else paste0("r", seq_len(regions))
     } else {
       if (verbose && !gen_regions) {
         cli_alert_info(paste(
           "regions:", if (gen_capacities) {
-            "specified region, with {.field N / nrow(regions)}"
+            "specified region, with {.field N / length(regions)}"
           } else {
             "specified regions and"
           }, "capacities"
         ))
       }
-      regions
+      if (length(region_ids)) region_ids else regions
     }
     regions <- matrix(
       ceiling(rnorm(length(rids) * 2, 1e5, 1e4)),
@@ -241,7 +259,8 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
   # selecting building type
   if (verbose) cli_alert_info("drawing building type and rental types")
   building_rent_boost <- if (n_building_types < 2) 1 else sample.int(n_building_types, ceiling(n_building_types * .3))
-  building_type <- if (n_building_types < 2) rep(1, nr) else sample.int(n_building_types, length(head_income), TRUE)
+  region_building_type <- if (n_building_types < 2) rep(1, nr) else sample.int(n_building_types, nr, TRUE)
+  building_type <- region_building_type[region]
 
   # select household sizes
   if (!is.numeric(size_loci) || size_loci < 1) {
@@ -290,6 +309,10 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, att
     params = list(
       neighbors = n_neighbors, range = neighbor_range, races_rates = race_rates,
       n_building_types = n_building_types, building_type_rent = building_rent_boost
+    ),
+    regions = cbind(
+      id = rids, capacity = capacities, cost = region_cost,
+      building_type = region_building_type, size = size_prob, regions
     ),
     households = data.frame(
       household,

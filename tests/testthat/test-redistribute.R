@@ -60,6 +60,7 @@ test_that("intersect map work", {
     id = c("a", "b"), a = c(225, 2250), b = rnorm(2) * 1000, c = rnorm(2) * 1000,
     geometry = st_sfc(st_polygon(list(square * 5e-4)), st_polygon(list(square * 5e-4 + adj_right * 5e-4)))
   ))
+  totals <- colSums(source[, 2:4, drop = TRUE])
   vars <- colnames(source)[2:4]
   target <- st_as_sf(data.frame(
     id = paste0(rep(c("a", "ab", "b"), c(20, 5, 20)), c(1:20, 1:5, 1:20)), population = 1000, # sample.int(1e5, 45),
@@ -91,8 +92,8 @@ test_that("intersect map work", {
   rownames(mres) <- NULL
   expect_identical(sub(" \\[.*$", "", substring(capture.output(
     res <- redistribute(
-      source, target,
-      weight = "population", source_id = "id", target_id = "id", map = map, verbose = TRUE
+      source, target, map,
+      weight = "population", source_id = "id", target_id = "id", verbose = TRUE
     ),
     type = "message"
   ), 3)), c(
@@ -107,7 +108,29 @@ test_that("intersect map work", {
     ""
   ))
   expect_equal(res[, 1:4, drop = TRUE], mres[, 1:4, drop = TRUE])
+  expect_equal(colSums(res[, 2:4, drop = TRUE]), totals)
   expect_identical(redistribute(source[, -1], target, weight = "population")[, -1], res[, -1])
+
+  ### non-partial weights result in the same totals
+  expect_equal(colSums(redistribute(
+    source, target, lapply(map, names),
+    weight = "population", source_id = "id", target_id = "id"
+  )[, 2:4, drop = TRUE], na.rm = TRUE), totals)
+  expect_equal(colSums(redistribute(
+    source, target, lapply(map, names),
+    overlaps = "first",
+    weight = "population", source_id = "id", target_id = "id"
+  )[, 2:4, drop = TRUE], na.rm = TRUE), totals)
+  expect_equal(colSums(redistribute(
+    source, target, lapply(map, names),
+    overlaps = "last",
+    weight = "population", source_id = "id", target_id = "id"
+  )[, 2:4, drop = TRUE], na.rm = TRUE), totals)
+  expect_equal(colSums(redistribute(
+    source, target, lapply(map, names),
+    overlaps = "random",
+    weight = "population", source_id = "id", target_id = "id"
+  )[, 2:4, drop = TRUE], na.rm = TRUE), totals)
 
   ## aggregation
   map_weight <- c(1, .5)[grepl("^ab", target$id) + 1]
