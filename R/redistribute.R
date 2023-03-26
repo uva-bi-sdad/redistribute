@@ -240,7 +240,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       if (!any(sid %in% onames)) {
         if (all(!grepl("[^0-9]", onames))) {
           onames <- as.integer(onames)
-          if (min(onames) > 0 && max(onames) <= length(sid)) {
+          if (!anyNA(onames) && min(onames) > 0 && max(onames) <= length(sid)) {
             if (verbose) cli_alert_info("inverting map, with entry values mapped to source IDs")
             names(mw) <- rep(names(map), vapply(map, length, 0))
             map <- split(mw, sid[onames])

@@ -1,7 +1,7 @@
 #' Download U.S. Census Microdata
 #'
 #' Download and load U.S. census American Community Survey (ACS) Public Use Microdata Samples (PUMS):
-#' (census.gov/programs-surveys/acs/microdata.html)[https://www.census.gov/programs-surveys/acs/microdata.html]
+#' [census.gov/programs-surveys/acs/microdata.html](https://www.census.gov/programs-surveys/acs/microdata.html)
 #'
 #'
 #' @param dir Directory in which to save the file(s).
@@ -65,7 +65,7 @@ download_census_pums <- function(dir, state, year = 2021, level = "both", one_ye
   } else {
     tdir <- paste0(tempdir(), "/")
   }
-  folder <- paste0(tdir, "pums_", state, "/", year, "/")
+  folder <- paste0(tdir, "pums_", state, "/", year, "/", summary, "/")
   dir.create(folder, FALSE, TRUE)
   res <- list(year = year, state = state, dictionary = NULL, household = NULL, person = NULL)
   dict_json <- paste0(folder, paste0("PUMS_Data_Dictionary_", year, ".json"))
@@ -97,7 +97,7 @@ download_census_pums <- function(dir, state, year = 2021, level = "both", one_ye
     )
     write_json(res$dictionary, dict_json, auto_unbox = TRUE)
   }
-  files <- paste0(folder, "/", c("h", "p"), summary, ".csv.xz")
+  files <- paste0(folder, "/", c("h", "p"), ".csv.xz")
   if (level != "b") {
     lid <- (level == "p") + 1
     urls <- urls[lid]

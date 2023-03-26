@@ -6,7 +6,7 @@
 \usage{
 generate_population(N = 1000, regions = NULL, capacities = NULL,
   region_ids = NULL, attraction_loci = 3, random_regions = 0.1,
-  cost_loci = 2, size_loci = 2, similarity_metric = "euclidean",
+  cost_loci = 2, size_loci = 5, similarity_metric = "euclidean",
   n_neighbors = 50, neighbor_range = 0.5, n_races = 6,
   n_building_types = 3, verbose = FALSE)
 }

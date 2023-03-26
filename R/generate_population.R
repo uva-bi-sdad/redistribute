@@ -103,7 +103,7 @@
 #' @export
 
 generate_population <- function(N = 1000, regions = NULL, capacities = NULL, region_ids = NULL,
-                                attraction_loci = 3, random_regions = .1, cost_loci = 2, size_loci = 2,
+                                attraction_loci = 3, random_regions = .1, cost_loci = 2, size_loci = 5,
                                 similarity_metric = "euclidean", n_neighbors = 50,
                                 neighbor_range = .5, n_races = 6, n_building_types = 3, verbose = FALSE) {
   gen_regions <- missing(regions)
@@ -250,7 +250,7 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
   }
   selected_cost_loci <- sample.int(nr, cost_loci)
   space_cols[selected_cost_loci] <- 1L
-  region_cost <- rnorm(nr, (as.numeric(space %*% space_cols) / nr) * 3e5, 3e4)
+  region_cost <- abs(rnorm(nr, as.numeric(space %*% space_cols) * 5e5, 1e5))
   space_cols[selected_cost_loci] <- 0L
   head_income <- abs(as.integer(
     rnorm(N, region_cost[region], 2e3) + (rbeta(N, .1, 1) - .6) * region_cost[region]
@@ -273,10 +273,10 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
     cli_alert_info("size loci: {.field {size_loci}}")
   }
   selected_size_loci <- sample.int(nr, size_loci)
-  space_cols[selected_size_loci] <- 1L
-  size_prob <- ((space %*% space_cols) / nr)[region, ] +
+  space_cols[selected_size_loci] <- .1 / size_loci
+  size_prob <- ((space %*% space_cols)^2)[region, ] + 1 +
     rbeta(N, head_income / max(head_income) * building_type / max(building_type), 1)
-  size <- rpois(N, 1 + size_prob * (max(size_prob) - size_prob) / 1) + 1L
+  size <- rpois(N, size_prob + (capacities[region] > 1)) + 1L
 
   # selecting renting status
   if (verbose) cli_alert_info("drawing renting status")
@@ -310,9 +310,9 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
       neighbors = n_neighbors, range = neighbor_range, races_rates = race_rates,
       n_building_types = n_building_types, building_type_rent = building_rent_boost
     ),
-    regions = cbind(
+    regions = data.frame(
       id = rids, capacity = capacities, cost = region_cost,
-      building_type = region_building_type, size = size_prob, regions
+      building_type = region_building_type, regions
     ),
     households = data.frame(
       household,
