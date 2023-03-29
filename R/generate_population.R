@@ -258,8 +258,17 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
 
   # selecting building type
   if (verbose) cli_alert_info("drawing building type and rental types")
-  building_rent_boost <- if (n_building_types < 2) 1 else sample.int(n_building_types, ceiling(n_building_types * .3))
-  region_building_type <- if (n_building_types < 2) rep(1, nr) else sample.int(n_building_types, nr, TRUE)
+  region_building_type <- rep(1L, nr)
+  if (n_building_types > 1) {
+    su <- capacities == 1
+    if (any(su)) {
+      region_building_type[su] <- if (n_building_types == 2) {
+        2L
+      } else {
+        sample.int(n_building_types - 1, sum(su), TRUE) + 1L
+      }
+    }
+  }
   building_type <- region_building_type[region]
 
   # select household sizes
@@ -281,7 +290,7 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
   # selecting renting status
   if (verbose) cli_alert_info("drawing renting status")
   renting <- rbinom(N, 1, ((head_income < mean(head_income)) * .2 + .4) *
-    ((building_type %in% building_rent_boost) * .3 + .5))
+    ((building_type == 1) * .3 + .5))
 
   # select race base rates
   if (verbose) cli_alert_info("drawing race baserates")
@@ -308,7 +317,7 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
   list(
     params = list(
       neighbors = n_neighbors, range = neighbor_range, races_rates = race_rates,
-      n_building_types = n_building_types, building_type_rent = building_rent_boost
+      n_building_types = n_building_types
     ),
     regions = data.frame(
       id = rids, capacity = capacities, cost = region_cost,

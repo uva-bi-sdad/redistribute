@@ -252,7 +252,7 @@ block_groups <- block_groups[block_groups$GEOID %in% parcels$geoid, ]
 
 ## from tracts to parcels
 map_tr_to_parcel <- split(
-  names(unlist(unname(map_bg_to_parcel))),
+  unlist(unname(map_bg_to_parcel)),
   rep(substring(names(map_bg_to_parcel), 1, 11), vapply(map_bg_to_parcel, length, 0)),
 )
 
@@ -268,7 +268,7 @@ mean(abs(estimate_redist$Total - block_groups$Total))
 Now there is more of the original variation between block groups:
 
 ```{r, fig.show="hold", out.width="50%", warning=FALSE, echo=FALSE}
-parcel_selection <- map_tr_to_parcel[["51013100700"]]
+parcel_selection <- names(map_tr_to_parcel[["51013100700"]])
 
 ggplot(block_groups[selection, ]) +
   theme +
@@ -866,6 +866,268 @@ kable(Reduce("+", results_altgeo) / length(results_altgeo), digits = 3)
 library(splot)
 for (var in c("sex_female", "race_native", "income_lt50", "Average")) {
   dist <- do.call(rbind, lapply(results_altgeo, function(r) r[var, ]))
+  splot(
+    dist,
+    title = var, labx = "Mean Absolute Error", laby = "Density",
+    leg.title = "Methods", leg = "out"
+  )
+}
+```
+
+## Simulated Populations
+
+So far, we've used the same data at different initial geolayers
+as a way to introduce error while still having a known target to
+measure error from. This may have the benefit of retaining some properties
+of the data that affect our methods in unknown ways, but the down side is
+that we cannot very directly measure error, and we are testing against
+estimates with their own error.
+
+An alternative is to simulate the initial population, then draw samples
+from that population to form simulated version of the data we have available
+(sparse PUM samples, and less sparse block group summaries). Then, instead of
+having to go down to parcels and back up to artificially unknown intermediate
+layers (block groups) to measure error, we can measure directly at the parcel level.
+
+```{r, warning=FALSE}
+# simulating the whole population is pretty intensive,
+# so we'll just do that once, then draw samples from it
+population_file <- paste0(base_dir, "/simulated_population.rds")
+if (file.exists(population_file)) {
+  population <- readRDS(population_file)
+} else {
+  population <- generate_population(sum(parcels$Total), parcels, "Total", "OBJECTID")
+  population$households$SERIALNO <- population$households$household
+  population$individuals$ID <- population$individuals$person
+
+  # make categories
+
+  ## household
+  population$households$building_type <- c(
+    "MULTI", "SFD", "SFA"
+  )[population$households$building_type]
+  population$households$status <- c("OWNER", "RENTER")[
+    population$households$renting + 1
+  ]
+  population$households$Total <- structure(
+    population$regions$capacity,
+    names = population$regions$id
+  )[population$households$region]
+  population$households$head_income <- population$households$head_income /
+    max(population$households$head_income) * max(pums$household$HINCP)
+  population$households$income_cat <- as.character(cut(
+    population$households$head_income,
+    c(-Inf, 50, 100, 200, Inf) * 1e3,
+    c("income_lt50", "income_50_100", "income_100_200", "income_gt200"),
+    right = TRUE
+  ))
+
+  ## individual
+  population$individuals$sex_cat <- c("sex_male", "sex_female")[
+    population$individuals$sex + 1
+  ]
+  population$individuals$race_cat <- rep_len(
+    grep("^race", vars, value = TRUE), max(population$individuals$race) + 1
+  )[population$individuals$race + 1]
+  population$individuals$income <- population$individuals$income /
+    max(population$individuals$income) * max(pums$household$HINCP)
+  population$individuals$income_cat <- as.character(cut(
+    population$individuals$income,
+    c(-Inf, 50, 100, 200, Inf) * 1e3,
+    c("income_lt50", "income_50_100", "income_100_200", "income_gt200"),
+    right = TRUE
+  ))
+  combined <- cbind(
+    population$households[population$individuals$household, ],
+    population$individuals
+  )
+  population$summary <- do.call(rbind, lapply(
+    split(combined, as.character(combined$region)),
+    function(d) {
+      household <- d[!duplicated(d$household), ]
+      owner <- household$status == "OWNER"
+      renter <- household$status == "RENTER"
+      cbind(
+        id = household$region[[1]],
+        Total = household$Total[[1]],
+        Owner_Occupied = sum(owner),
+        Renter_Occupied = sum(renter),
+        avg_hhsize = mean(household$size),
+        avg_hhsize_own = if (sum(owner)) mean(household$size[owner]) else 0,
+        avg_hhsize_rent = if (sum(renter)) mean(household$size[renter]) else 0,
+        as.data.frame(as.list(unlist(lapply(
+          names(vars_list),
+          function(var) as.list(table(factor(d[[var]], vars_list[[var]])))
+        ))))
+      )
+    }
+  ))
+
+  saveRDS(population, population_file, compress = "xz")
+}
+```
+
+First, we can look at the block group summaries of the full simulated population:
+
+```{r, echo=FALSE, fig.height=4.5, fig.width=8.1}
+bg_sim <- redistribute(population$summary, block_groups, map_bg_to_parcel)
+all_values <- bg_sim$sex_male
+pal <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
+leaflet(
+  st_transform(bg_sim, "WGS84"),
+  options = leafletOptions(attributionControl = FALSE)
+) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addScaleBar("bottomleft") |>
+  addControl("Male Population", "topright") |>
+  addPolygons(
+    fillColor = ~ pal(sex_male), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Simulation", label = ~ paste(
+      id, "Male Population:", round(sex_male, 3)
+    )
+  ) |>
+  addLegend("bottomright", pal, all_values, opacity = 1, title = "Male Population")
+```
+
+The redistribution methods apply to census-like samples from a full population,
+so we'll set up a function to both draw a sample and apply methods to it:
+
+```{r}
+## for the initial sample, we'll aim for an even
+## sampling from across block groups
+sample_n <- ceiling(nrow(population$households) * .1 / nrow(block_groups))
+map_parcel_to_bg <- structure(
+  rep(names(map_bg_to_parcel), vapply(map_bg_to_parcel, length, 0)),
+  names = names(unlist(unname(map_bg_to_parcel)))
+)
+draw_sample <- function(run = NULL, return_full = FALSE) {
+  # draw households, and retrieve individuals within them
+  sample_hh <- lapply(map_bg_to_parcel, function(bg) {
+    names(if (length(bg) < sample_n) bg else sample(bg, sample_n))
+  })
+  full <- population$households[
+    population$households$household %in% unlist(sample_hh, use.names = FALSE),
+  ]
+  full$WGTP <- 1
+  full_individuals <- population$individuals[
+    population$individuals$household %in% full$household,
+  ]
+  full_individuals$PWGTP <- 1
+  individuals <- cbind(
+    full[as.character(full_individuals$household), c("region", vars_house)],
+    full_individuals[, vars_person]
+  )
+  individuals$SERIALNO <- as.character(individuals$SERIALNO)
+  individuals$ID <- as.character(individuals$ID)
+  individuals$geoid <- structure(
+    rep(names(sample_hh), vapply(sample_hh, length, 0)),
+    names = unlist(sample_hh, use.names = FALSE)
+  )[individuals$SERIALNO]
+
+  bg <- do.call(rbind, lapply(split(individuals, individuals$geoid), function(d) {
+    hh <- d[!duplicated(d$SERIALNO), ]
+    hh$size <- table(d$SERIALNO)[hh$SERIALNO]
+    size <- tapply(hh$size, factor(hh$status, c("OWNER", "RENTER")), mean)
+    size[is.na(size)] <- 0
+    cbind(
+      id = d$geoid[[1]],
+      as.data.frame(unlist(lapply(
+        names(vars_list), function(var) {
+          as.list(vapply(
+            unique(vars_list[[var]]), function(l) sum((d[[var]] == l) * d$PWGTP), 0
+          ))
+        }
+      ), recursive = FALSE)),
+      avg_hhsize = mean(hh$size),
+      avg_hhsize_own = size[["OWNER"]],
+      avg_hhsize_rent = size[["RENTER"]]
+    )
+  }))
+
+  ps <- cbind(
+    population$regions,
+    population$summary[population$regions$id, c("Total", vars_units[-1])]
+  )
+  ps$OBJECTID <- population$regions$id
+  ps$geoid <- map_parcel_to_bg[population$regions$id]
+  ps$Unit_Type <- c("MULTI", "SFD", "SFA")[ps$building_type]
+  ps$Residents <- ps$Total * structure(bg$avg_hhsize, names = bg$id)[ps$geoid]
+
+  vdata <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
+    ps <- ps[ps$id %in% data[[puma]]$parcels$OBJECTID, ]
+    su <- which(individuals$region %in% ps$id)
+    list(
+      map = map_bg_to_parcel,
+      individuals = individuals[sample(su, floor(length(su) * .3)), ],
+      parcels = ps,
+      source = bg[bg$id %in% ps$geoid, ]
+    )
+  })
+  ps <- do.call(rbind, lapply(vdata, "[[", "parcels"))
+  vestimates <- list(
+    Prop = redistribute(
+      bg, ps, map_bg_to_parcel,
+      weight = "Total", source_id = "id", default_value = 0
+    ),
+    "Prop Adj" = redistribute(
+      bg, ps, map_bg_to_parcel,
+      weight = "Residents", source_id = "id", default_value = 0
+    ),
+    Baseline = apply_method(vdata, est_baseline, parcel_only = TRUE),
+    Rake = apply_method(vdata, est_rake, parcel_only = TRUE),
+    "Rake 2 Step" = apply_method(vdata, est_twostep, parcel_only = TRUE),
+    "Rake General" = apply_method(vdata, est_grake, parcel_only = TRUE)
+  )
+  actual <- population$summary[ps$id, ]
+  verror <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
+    colMeans(abs(as.data.frame(
+      lapply(vestimates, function(d) d[[var]]),
+      check.names = FALSE
+    ) - actual[[var]]))
+  }))
+  verror <- rbind(verror, Average = colMeans(verror))
+  if (return_full) {
+    list(
+      data = data, source = bg, parcels = ps, map = map_bg_to_parcel,
+      estimates = vestimates, error = verror
+    )
+  } else {
+    verror
+  }
+}
+```
+
+Now we can look at results from a single sample. These are not comparable to the
+other results because (a) they are simulated independently from
+the real samples (so, for instance, the race category baselines are randomized),
+and (b) error is measured at the parcel level, rather than the block group level.
+
+```{r, warning=FALSE}
+estimates_sim <- draw_sample(return_full = TRUE)
+kable(estimates_sim$error, digits = 5)
+```
+
+We can also look at results across samples from the same simulated population:
+
+```{r, warning=FALSE}
+results_sim_file <- paste0(base_dir, "/results_sim.rds")
+if (file.exists(results_sim_file)) {
+  results_sim <- readRDS(results_sim_file)
+} else {
+  results_sim <- lapply(1:50, draw_sample)
+  saveRDS(results_sim, results_sim_file)
+}
+
+kable(Reduce("+", results_sim) / length(results_sim), digits = 5)
+```
+
+For some reason, only the estimation methods vary at all in this case:
+
+```{r, echo=FALSE, fig.height=4.1, fig.width=8.1}
+library(splot)
+for (var in c("sex_female", "race_black", "income_gt200", "Average")) {
+  dist <- do.call(rbind, lapply(results_sim, function(r) r[var, -(1:2)]))
   splot(
     dist,
     title = var, labx = "Mean Absolute Error", laby = "Density",
