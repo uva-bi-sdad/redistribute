@@ -53,6 +53,8 @@
 #' (and \code{capacities} is not specified), regions similar to housing units (with a mix of
 #' single and multi-family locations) will be generated.
 #' @param capacities A vector with the maximum number of households for each entry in \code{regions}.
+#' @param sizes A numeric vector with a size for each entry in \code{regions}. A scaled version
+#' of this is used to generate household sizes in single capacity regions.
 #' @param region_ids A vector of unique IDs for each \code{regions}, or a column name in
 #' \code{regions} containing IDs.
 #' @param attraction_loci Number of locations selected to be centers of attractiveness,
@@ -102,7 +104,7 @@
 #' }
 #' @export
 
-generate_population <- function(N = 1000, regions = NULL, capacities = NULL, region_ids = NULL,
+generate_population <- function(N = 1000, regions = NULL, capacities = NULL, sizes = NULL, region_ids = NULL,
                                 attraction_loci = 3, random_regions = .1, cost_loci = 2, size_loci = 5,
                                 similarity_metric = "euclidean", n_neighbors = 50,
                                 neighbor_range = .5, n_races = 6, n_building_types = 3, verbose = FALSE) {
@@ -185,6 +187,23 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
   }
   nr <- length(rids)
   capacities <- rep_len(if (!is.numeric(capacities)) N / nr else capacities, nr)
+  if (length(sizes) == 1 && sizes %in% colnames(regions)) {
+    if (verbose) cli_alert_info("sizes: {.field {sizes}} column")
+    su <- colnames(regions) != sizes
+    sizes <- regions[[sizes]]
+    regions <- regions[, su, drop = FALSE]
+  }
+  if (is.null(sizes)) {
+    if (verbose) cli_alert_info("sizes: random")
+    sizes <- rnorm(nr)
+  } else if (length(sizes) != nr) {
+    if (verbose) cli_alert_info("sizes: provided vector, repeated to fit regions")
+    sizes <- rep_len(sizes, nr)
+  } else if (verbose) cli_alert_info("sizes: provided vector")
+  if (!is.numeric(sizes)) cli_abort("{.arg sizes} is not numeric")
+  if (anyNA(sizes)) sizes[is.na(sizes)] <- 0
+  sizes_min <- min(sizes)
+  sizes <- (sizes - sizes_min) / (max(sizes) - sizes_min)
 
   if (verbose) cli_alert_info("preparing {.field {N}} households")
   household <- seq_len(N)
@@ -259,8 +278,8 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
   # selecting building type
   if (verbose) cli_alert_info("drawing building type and rental types")
   region_building_type <- rep(1L, nr)
+  su <- capacities == 1
   if (n_building_types > 1) {
-    su <- capacities == 1
     if (any(su)) {
       region_building_type[su] <- if (n_building_types == 2) {
         2L
@@ -283,9 +302,17 @@ generate_population <- function(N = 1000, regions = NULL, capacities = NULL, reg
   }
   selected_size_loci <- sample.int(nr, size_loci)
   space_cols[selected_size_loci] <- .1 / size_loci
-  size_prob <- ((space %*% space_cols)^2)[region, ] + 1 +
-    rbeta(N, head_income / max(head_income) * building_type / max(building_type), 1)
-  size <- rpois(N, size_prob + (capacities[region] > 1)) + 1L
+  su <- su * 1
+  size_prob <- rnorm(
+    N,
+    (
+      su + su * sizes * 10 + (space %*% space_cols) * size_loci
+    )[region, ] +
+      head_income / max(head_income) * 5 +
+      1 / building_type * .5,
+    .4
+  )
+  size <- rpois(N, abs(size_prob)) + 1L
 
   # selecting renting status
   if (verbose) cli_alert_info("drawing renting status")
