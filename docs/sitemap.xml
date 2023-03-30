@@ -4,6 +4,12 @@
     <loc>/404.html</loc>
   </url>
   <url>
+    <loc>/LICENSE-text.html</loc>
+  </url>
+  <url>
+    <loc>/LICENSE.html</loc>
+  </url>
+  <url>
     <loc>/articles/estimate_comparisons.html</loc>
   </url>
   <url>
@@ -20,12 +26,6 @@
   </url>
   <url>
     <loc>/index.html</loc>
-  </url>
-  <url>
-    <loc>/LICENSE-text.html</loc>
-  </url>
-  <url>
-    <loc>/LICENSE.html</loc>
   </url>
   <url>
     <loc>/reference/download_census_pums.html</loc>

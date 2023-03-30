@@ -255,6 +255,15 @@ map_tr_to_parcel <- split(
   rep(substring(names(map_bg_to_parcel), 1, 11), vapply(map_bg_to_parcel, length, 0)),
 )
 
+# check that down from and up to the same level works
+all.equal(
+  as.data.frame(redist_downup(
+    block_groups, parcels, block_groups, map_bg_to_parcel, map_bg_to_parcel,
+    source_id = "GEOID"
+  )[, -1]),
+  as.data.frame(block_groups[, -1])
+)
+
 # redistribute
 estimate_redist <- redist_downup(
   tracts, parcels, block_groups, map_tr_to_parcel, map_bg_to_parcel
@@ -294,18 +303,8 @@ we may be able to refine our redistribution based on some heuristic
 estimates of number of people per living unit:
 
 ```{r}
-# start with number of units
-parcels$Residents <- parcels$Total
-
-## for parcels with more than 1 unit, assume 2.5 per unit
-su <- parcels$Total > 1
-parcels$Residents[su] <- parcels$Total[su] * 2.5
-
-## for 1-unit parcels, bases on size
-su <- parcels$Total == 1
-parcels$Residents[su] <- as.numeric(cut(
-  parcels$Shape__Area[su], c(-Inf, 6000, 9000, 20000, 40000, Inf)
-)) + 4
+# 2.5 for multi-unit parcels, 5.5 for single-unit parcels
+parcels$Residents <- parcels$Total * 2.5 + (parcels$Total == 1) * 3
 
 # now see if this improved our redistribution
 estimate_redist_adj <- redist_downup(
@@ -901,9 +900,7 @@ population_file <- paste0(base_dir, "/simulated_population.rds")
 if (file.exists(population_file)) {
   population <- readRDS(population_file)
 } else {
-  population <- generate_population(
-    sum(parcels$Total), parcels, "Total", "Shape__Area", "OBJECTID"
-  )
+  population <- generate_population(sum(parcels$Total), parcels, "Total", "OBJECTID")
   population$households$SERIALNO <- population$households$household
   population$individuals$ID <- population$individuals$person
 
@@ -1059,19 +1056,7 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
   ps$OBJECTID <- population$regions$id
   ps$geoid <- map_parcel_to_bg[population$regions$id]
   ps$Unit_Type <- c("MULTI", "SFD", "SFA")[ps$building_type]
-  
-  ps$Residents <- parcels$Total
-  su <- ps$Total > 1
-  ps$Residents[su] <- ps$Total[su] * 2.5
-  
-  ps$Shape__Area <- structure(
-    parcels$Shape__Area,
-    names = parcels$OBJECTID
-  )[ps$id]
-  su <- ps$Total == 1
-  ps$Residents[su] <- as.numeric(cut(
-    ps$Shape__Area[su], c(-Inf, 6000, 9000, 20000, 40000, Inf)
-  )) + 4
+  ps$Residents <- ps$Total * 2.5 + (ps$Total == 1) * 3
 
   vdata <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
     ps <- ps[ps$id %in% data[[puma]]$parcels$OBJECTID, ]
