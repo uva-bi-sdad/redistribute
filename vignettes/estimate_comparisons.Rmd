@@ -148,7 +148,8 @@ st_geometry(block_groups) <- st_geometry(geography_bg[block_groups$GEOID, ])
 parcel_file <- paste0(base_dir, "/parcels.rds")
 if (!file.exists(parcel_file)) {
   parcels <- st_read(paste0(
-    "https://arlgis.arlingtonva.us/arcgis/rest/services/Open_Data/od_MHUD_Polygons/",
+    "https://arlgis.arlingtonva.us/arcgis/rest/",
+    "services/Open_Data/od_MHUD_Polygons/",
     "FeatureServer/0/query?where=1=1&outFields=*&outSR=4326&f=json"
   ))
   saveRDS(parcels, parcel_file, compress = "xz")
@@ -250,10 +251,9 @@ parcels$geoid <- structure(
 block_groups <- block_groups[block_groups$GEOID %in% parcels$geoid, ]
 
 ## from tracts to parcels
-map_tr_to_parcel <- split(
-  unlist(unname(map_bg_to_parcel)),
-  rep(substring(names(map_bg_to_parcel), 1, 11), vapply(map_bg_to_parcel, length, 0)),
-)
+map_tr_to_parcel <- split(unlist(unname(map_bg_to_parcel)), rep(
+  substring(names(map_bg_to_parcel), 1, 11), vapply(map_bg_to_parcel, length, 0)
+))
 
 # check that down from and up to the same level works
 all.equal(
@@ -316,7 +316,54 @@ estimate_redist_adj <- redist_downup(
 mean(abs(estimate_redist_adj$Total - block_groups$Total))
 ```
 
-# Estimation
+For a better sense of what this resident adjustment is doing, we can
+look at the difference made in a single tract:
+
+```{r}
+# identify the most different tract between variants
+tract <- substring(block_groups$GEOID[
+  which.max(abs(estimate_redist_adj$Total - estimate_redist$Total))
+], 1, 11)
+su <- substring(estimate_redist$id, 1, 11) == tract
+tsu <- tracts$id == tract
+psu <- substring(parcels$geoid, 1, 11) == tract
+
+# recalculate parcel-level values within that tract
+differences <- list(
+  parcels = redistribute(
+    tracts$Total[tsu], parcels[psu, ],
+    target_id = "OBJECTID", weight = "Residents", return_geometry = FALSE
+  )[, 2] - redistribute(
+    tracts$Total[tsu], parcels[psu, ],
+    target_id = "OBJECTID", weight = "Total", return_geometry = FALSE
+  )[, 2],
+  block_group = estimate_redist_adj$Total[su] - estimate_redist$Total[su]
+)
+```
+
+Now we can look at the difference in the contained parcels and block groups:
+
+```{r, echo=FALSE, fig.height=4.5, fig.width=8.1}
+ggplot() +
+  theme +
+  scale_fill_scico(
+    name = "Resident - Unit", palette = "vik", midpoint = 0, direction = -1
+  ) +
+  geom_sf(
+    aes(fill = differences$block_group),
+    st_geometry(block_groups[su, ])
+  ) +
+  geom_sf(
+    aes(fill = differences$parcels),
+    st_geometry(parcels)[psu],
+    color = "#000000"
+  )
+```
+
+In this case, the difference mostly comes down to two buildings
+with many units that get less relative weight with the resident values.
+
+# PUMS + Raking
 
 So far, we've used some additional information (total units) at the parcel level
 to improve the distribution of values across block groups, relative to a uniform
@@ -657,9 +704,13 @@ est_grake <- function(source, target, individuals) {
   })
   household <- unique(individuals$building_type)
   household <- structure(numeric(length(household)), names = household)
-  observed_types <- tapply(rowSums(target[, vars_units[-1]]), target$Unit_Type, sum)
+  observed_types <- tapply(
+    rowSums(target[, vars_units[-1]]), target$Unit_Type, sum
+  )
   household[names(observed_types)] <- observed_types
-  household <- list(data.frame(building_type = names(household), count = household))
+  household <- list(data.frame(
+    building_type = names(household), count = household
+  ))
   household[[1]]$count[is.na(household[[1]]$count)] <- 1
   household[[2]] <- data.frame(
     status = c("RENTER", "OWNER"),
@@ -694,14 +745,20 @@ est_grake <- function(source, target, individuals) {
       error = function(e) NULL
     )
   }
-  individuals$weight <- if (is.null(fm$weight)) individuals$PWGTP else fm$weight
+  individuals$weight <- if (is.null(fm$weight)) {
+    individuals$PWGTP
+  } else {
+    fm$weight
+  }
   environment(make_estimates) <- environment()
   make_estimates()
 }
 estimate_grake <- apply_method(data, est_grake)
 ```
 
-## Comparison
+# Comparisons
+
+## Tract Aggregates
 
 Now we can compare all of the considered methods within
 each of the variables we used to inform the raking approaches:
@@ -758,22 +815,27 @@ block groups.
 # randomly combine adjacent block groups into pairs of 2 (were possible)
 # apply within each PUMA
 apply_altgeo <- function(run = NULL, return_full = FALSE) {
-  vdata <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
-    d <- data[[puma]]
-    su <- substring(block_groups$GEOID, 1, 11) %in% d$source$id
-    vtr <- make_parent_polygons(
-      block_groups[su, ], "GEOID",
-      n_as_min = TRUE, verbose = FALSE
-    )
-    names(vtr$new) <- names(vtr$map) <- paste0(puma, "_", seq_along(vtr$new))
-    d$geography <- vtr$new
-    d$map <- vtr$map
-    d$source <- redistribute(
-      block_groups[su, c("GEOID", vars)], vtr$new, vtr$map,
-      default_value = 0
-    )
-    d
-  })
+  vdata <- lapply(
+    structure(pumas_focal, names = pumas_focal),
+    function(puma) {
+      d <- data[[puma]]
+      su <- substring(block_groups$GEOID, 1, 11) %in% d$source$id
+      vtr <- make_parent_polygons(
+        block_groups[su, ], "GEOID",
+        n_as_min = TRUE, verbose = FALSE
+      )
+      names(vtr$new) <- names(vtr$map) <- paste0(
+        puma, "_", seq_along(vtr$new)
+      )
+      d$geography <- vtr$new
+      d$map <- vtr$map
+      d$source <- redistribute(
+        block_groups[su, c("GEOID", vars)], vtr$new, vtr$map,
+        default_value = 0
+      )
+      d
+    }
+  )
   vsource <- do.call(rbind, lapply(vdata, "[[", "source"))
   vmap <- redistribute(
     vsource, parcels,
@@ -792,12 +854,15 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     "Rake 2 Step" = apply_method(vdata, est_twostep),
     "Rake General" = apply_method(vdata, est_grake)
   )
-  verror <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
-    colMeans(abs(as.data.frame(
-      lapply(vestimates, function(d) d$block_groups[[var]]),
-      check.names = FALSE
-    ) - block_groups[[var]]))
-  }))
+  verror <- do.call(rbind, lapply(
+    structure(vars, names = vars),
+    function(var) {
+      colMeans(abs(as.data.frame(
+        lapply(vestimates, function(d) d$block_groups[[var]]),
+        check.names = FALSE
+      ) - block_groups[[var]]))
+    }
+  ))
   verror <- rbind(verror, Average = colMeans(verror))
   if (return_full) {
     list(
@@ -900,7 +965,9 @@ population_file <- paste0(base_dir, "/simulated_population.rds")
 if (file.exists(population_file)) {
   population <- readRDS(population_file)
 } else {
-  population <- generate_population(sum(parcels$Total), parcels, "Total", "OBJECTID")
+  population <- generate_population(
+    sum(parcels$Total), parcels, "Total", "OBJECTID"
+  )
   population$households$SERIALNO <- population$households$household
   population$individuals$ID <- population$individuals$person
 
@@ -1029,25 +1096,29 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
     names = unlist(sample_hh, use.names = FALSE)
   )[individuals$SERIALNO]
 
-  bg <- do.call(rbind, lapply(split(individuals, individuals$geoid), function(d) {
-    hh <- d[!duplicated(d$SERIALNO), ]
-    hh$size <- table(d$SERIALNO)[hh$SERIALNO]
-    size <- tapply(hh$size, factor(hh$status, c("OWNER", "RENTER")), mean)
-    size[is.na(size)] <- 0
-    cbind(
-      id = d$geoid[[1]],
-      as.data.frame(unlist(lapply(
-        names(vars_list), function(var) {
-          as.list(vapply(
-            unique(vars_list[[var]]), function(l) sum((d[[var]] == l) * d$PWGTP), 0
-          ))
-        }
-      ), recursive = FALSE)),
-      avg_hhsize = mean(hh$size),
-      avg_hhsize_own = size[["OWNER"]],
-      avg_hhsize_rent = size[["RENTER"]]
-    )
-  }))
+  bg <- do.call(rbind, lapply(
+    split(individuals, individuals$geoid),
+    function(d) {
+      hh <- d[!duplicated(d$SERIALNO), ]
+      hh$size <- table(d$SERIALNO)[hh$SERIALNO]
+      size <- tapply(hh$size, factor(hh$status, c("OWNER", "RENTER")), mean)
+      size[is.na(size)] <- 0
+      cbind(
+        id = d$geoid[[1]],
+        as.data.frame(unlist(lapply(
+          names(vars_list), function(var) {
+            as.list(vapply(
+              unique(vars_list[[var]]),
+              function(l) sum((d[[var]] == l) * d$PWGTP), 0
+            ))
+          }
+        ), recursive = FALSE)),
+        avg_hhsize = mean(hh$size),
+        avg_hhsize_own = size[["OWNER"]],
+        avg_hhsize_rent = size[["RENTER"]]
+      )
+    }
+  ))
 
   ps <- cbind(
     population$regions,
@@ -1058,16 +1129,19 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
   ps$Unit_Type <- c("MULTI", "SFD", "SFA")[ps$building_type]
   ps$Residents <- ps$Total * 2.5 + (ps$Total == 1) * 3
 
-  vdata <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
-    ps <- ps[ps$id %in% data[[puma]]$parcels$OBJECTID, ]
-    su <- which(individuals$region %in% ps$id)
-    list(
-      map = map_bg_to_parcel,
-      individuals = individuals[sample(su, floor(length(su) * .3)), ],
-      parcels = ps,
-      source = bg[bg$id %in% ps$geoid, ]
-    )
-  })
+  vdata <- lapply(
+    structure(pumas_focal, names = pumas_focal),
+    function(puma) {
+      ps <- ps[ps$id %in% data[[puma]]$parcels$OBJECTID, ]
+      su <- which(individuals$region %in% ps$id)
+      list(
+        map = map_bg_to_parcel,
+        individuals = individuals[sample(su, floor(length(su) * .3)), ],
+        parcels = ps,
+        source = bg[bg$id %in% ps$geoid, ]
+      )
+    }
+  )
   ps <- do.call(rbind, lapply(vdata, "[[", "parcels"))
   vestimates <- list(
     Prop = redistribute(
@@ -1084,12 +1158,15 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
     "Rake General" = apply_method(vdata, est_grake, parcel_only = TRUE)
   )
   actual <- population$summary[ps$id, ]
-  verror <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
-    colMeans(abs(as.data.frame(
-      lapply(vestimates, function(d) d[[var]]),
-      check.names = FALSE
-    ) - actual[[var]]))
-  }))
+  verror <- do.call(rbind, lapply(
+    structure(vars, names = vars),
+    function(var) {
+      colMeans(abs(as.data.frame(
+        lapply(vestimates, function(d) d[[var]]),
+        check.names = FALSE
+      ) - actual[[var]]))
+    }
+  ))
   verror <- rbind(verror, Average = colMeans(verror))
   if (return_full) {
     list(

@@ -208,10 +208,9 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
               break
             }
           }
-        } else if (all(nchar(sid) == nchar(sid[1]))) {
-          sl <- nchar(sid[1])
+        } else if (length(sid) > 1 && (sl <- nchar(sid[1])) > 1 && all(nchar(sid) == sl)) {
           for (i in seq_len(ncol(target))) {
-            if (any(substr(target[, i], 1, sl) %in% sid)) {
+            if (any(substr(target[, i, drop = TRUE], 1, sl) %in% sid)) {
               idi <- i
               break
             }
