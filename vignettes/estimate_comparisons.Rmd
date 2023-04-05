@@ -436,11 +436,9 @@ vars_list <- c(
   lapply(vars_person[-(1:2)], function(var) unique(pums$person[[var]])),
   income_cat = list(unique(pums$household$income_cat))
 )
-vars <- c(
-  unlist(vars_list, use.names = FALSE),
-  "avg_hhsize_own", "avg_hhsize_rent"
-)
 return_vars <- names(vars_list)
+pvars <- unlist(vars_list, use.names = FALSE)
+vars <- c(pvars, "avg_hhsize_own", "avg_hhsize_rent")
 
 # prepare datasets split into PUMAs
 pumas_focal <- unique(pums$crosswalk$PUMA5CE[pums$crosswalk$GEOID %in% tracts$id])
@@ -487,12 +485,12 @@ apply_method <- function(data, method, parcel_only = FALSE, rescale = TRUE) {
               each = nrow(est)
             )
           }
-          su <- !vars %in% colnames(est)
-          if (any(su)) est[, vars[su]] <- 0
-          cbind(target[, 1:2], est[as.character(target$OBJECTID), vars])
+          su <- !pvars %in% colnames(est)
+          if (any(su)) est[, pvars[su]] <- 0
+          cbind(target[, 1:2], est[as.character(target$OBJECTID), pvars])
         } else {
           est <- target[, 1:2]
-          est[, vars] <- 0
+          est[, pvars] <- 0
           est
         }
       }
@@ -564,6 +562,84 @@ est_baseline <- function(source, target, individuals) {
 # apply across PUMAs and tracts within them
 # and aggregate to block groups
 estimate_baseline <- apply_method(data, est_baseline)
+```
+
+Because this method does not make estimates that recover their initial values,
+we have to rescale them to be comparable. For illustration:
+
+```{r}
+# adjust tract counts so they match
+# unit totals * average household size across parcels
+tr_adj <- st_drop_geometry(tracts)
+pid <- substring(parcels$geoid, 1, 11)
+parcels$renter_est <- parcels$Renter_Occupied * structure(
+  tracts$avg_hhsize_rent,
+  names = tracts$id
+)[pid]
+parcels$owner_est <- parcels$Owner_Occupied * structure(
+  tracts$avg_hhsize_own,
+  names = tracts$id
+)[pid]
+parcels$resident_est <- parcels$renter_est + parcels$owner_est
+tr_adj$Total <- tapply(parcels$resident_est, pid, sum)[tr_adj$id]
+
+for (g in vars_list) {
+  tr_adj[, g] <- tr_adj[, g] / rowSums(tr_adj[, g]) * tr_adj$Total
+}
+tr_adj[is.na(tr_adj)] <- 0
+
+# make baseline parcel-level estimates without rescaling
+data_adj <- data
+data_adj[[1]]$source <- tr_adj[tr_adj$id %in% data[[1]]$source$id, c("id", vars)]
+data_adj[[2]]$source <- tr_adj[tr_adj$id %in% data[[2]]$source$id, c("id", vars)]
+parcel_adj <- apply_method(
+  data_adj, est_baseline,
+  rescale = FALSE, parcel_only = TRUE
+)
+
+# aggregate back up to tracts and measure per-category error
+tr_est <- redistribute(
+  parcel_adj, tr_adj, map_tr_to_parcel,
+  source_id = "OBJECTID", target_id = "id", default_value = 0
+)
+data.frame(MAE = round(vapply(
+  pvars, function(var) mean(abs(tr_est[[var]] - tr_adj[[var]])), 0
+), 5))
+
+## this method does recover the parcel-level totals and overall totals
+g <- c("sex_female", "sex_male")
+all(abs(rowSums(parcel_adj[, g]) - structure(
+  parcels$resident_est,
+  names = parcels$OBJECTID
+)[parcel_adj$OBJECTID]) < 1e-12)
+c(
+  original = sum(
+    rbind(data_adj[[1]]$source[, g], data_adj[[2]]$source[, g])
+  ),
+  parcel = sum(parcel_adj[, g]),
+  tract = sum(tr_est[, g])
+)
+
+# rescaling makes the totals line up
+parcel_adj_rescaled <- apply_method(
+  data_adj, est_baseline,
+  parcel_only = TRUE
+)
+tr_est_rescaled <- redistribute(
+  parcel_adj_rescaled, tr_adj, map_tr_to_parcel,
+  source_id = "OBJECTID", target_id = "id", default_value = 0
+)
+data.frame(MAE = round(vapply(
+  pvars, function(var) mean(abs(tr_est_rescaled[[var]] - tr_adj[[var]])), 0
+), 5))
+
+# just like the redistribution methods
+tr_redist <- redist_downup(
+  tr_adj, parcels, tr_adj, map_tr_to_parcel, map_tr_to_parcel
+)
+data.frame(MAE = round(vapply(
+  pvars, function(var) mean(abs(tr_redist[[var]] - tr_adj[[var]])), 0
+), 5))
 ```
 
 ## Raking
@@ -764,7 +840,7 @@ Now we can compare all of the considered methods within
 each of the variables we used to inform the raking approaches:
 
 ```{r}
-error <- do.call(rbind, lapply(structure(vars, names = vars), function(var) {
+error <- do.call(rbind, lapply(structure(pvars, names = pvars), function(var) {
   d <- cbind(
     Prop = estimate_redist[[var]],
     "Prop Adj" = estimate_redist_adj[[var]],
@@ -781,7 +857,7 @@ kable(error, digits = 3)
 
 ```{r, echo=FALSE}
 # save for site
-error <- do.call(cbind, lapply(structure(vars, names = vars), function(var) {
+error <- do.call(cbind, lapply(structure(pvars, names = pvars), function(var) {
   d <- cbind(
     original = block_groups[[var]],
     prop = estimate_redist[[var]],
@@ -855,7 +931,7 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     "Rake General" = apply_method(vdata, est_grake)
   )
   verror <- do.call(rbind, lapply(
-    structure(vars, names = vars),
+    structure(pvars, names = pvars),
     function(var) {
       colMeans(abs(as.data.frame(
         lapply(vestimates, function(d) d$block_groups[[var]]),
@@ -998,7 +1074,7 @@ if (file.exists(population_file)) {
     population$individuals$sex + 1
   ]
   population$individuals$race_cat <- rep_len(
-    grep("^race", vars, value = TRUE), max(population$individuals$race) + 1
+    grep("^race", pvars, value = TRUE), max(population$individuals$race) + 1
   )[population$individuals$race + 1]
   population$individuals$income <- population$individuals$income /
     max(population$individuals$income) * max(pums$household$HINCP)
@@ -1127,7 +1203,7 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
   ps$OBJECTID <- population$regions$id
   ps$geoid <- map_parcel_to_bg[population$regions$id]
   ps$Unit_Type <- c("MULTI", "SFD", "SFA")[ps$building_type]
-  ps$Residents <- ps$Total * 2.5 + (ps$Total == 1) * 3
+  ps$Residents <- ps$Total * 5 - (ps$Total == 1) * 4
 
   vdata <- lapply(
     structure(pumas_focal, names = pumas_focal),
@@ -1159,7 +1235,7 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
   )
   actual <- population$summary[ps$id, ]
   verror <- do.call(rbind, lapply(
-    structure(vars, names = vars),
+    structure(pvars, names = pvars),
     function(var) {
       colMeans(abs(as.data.frame(
         lapply(vestimates, function(d) d[[var]]),

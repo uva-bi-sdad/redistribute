@@ -95,7 +95,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   target_sf <- can_intersects && inherits(target, c("sfc", "sf"))
   can_intersects <- source_sf && target_sf
   intersect_map <- FALSE
-  if (length(dim(source)) != 2) source <- t(source)
+  if (length(dim(source)) != 2) source <- data.frame(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))
   if (length(source_id) > 1) {
     if (verbose) cli_alert_info("source IDs: {.arg source_id} vector")
