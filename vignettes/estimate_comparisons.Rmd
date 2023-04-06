@@ -164,7 +164,7 @@ Ultimately, we'll want to use these methods to get values for unobserved geograp
 but for this comparison of methods, we'll want a way to test their results against
 known values.
 
-For this test case, we can simply start at a higher geolayer, and make estimates
+For this test case, we can simply start at a higher geolevel, and make estimates
 at the block group level. To do that, we'll need to aggregate our block group data
 up to tracts:
 
@@ -543,6 +543,43 @@ make_estimates <- function() {
 
 Now we can apply each method to this same set of data.
 
+Before the new methods, we can also update our heuristic adjustment
+to the proportional redistribution method with PUMS information:
+
+```{r}
+# get average household size for single family versus other
+# home types within each PUMA
+pums$household$size <- table(pums$person$SERIALNO)[pums$household$SERIALNO]
+pums$household$single_family_home <- pums$household$building_type != "MULTI"
+
+households <- pums$household[pums$household$PUMA %in% pumas_focal, ]
+households$type <- do.call(
+  paste0, households[, c("PUMA", "single_family_home")]
+)
+
+# apply to parcels
+parcels$PUMA <- structure(
+  pums$crosswalk$PUMA5CE,
+  names = pums$crosswalk$GEOID
+)[substring(parcels$geoid, 1, 11)]
+parcels$single_family_home <- parcels$Unit_Type != "MULTI"
+parcels$type <- do.call(
+  paste0, parcels[, c("PUMA", "single_family_home"), drop = TRUE]
+)
+
+# update resident estimate
+parcels$Residents <- parcels$Total * 2 + tapply(
+  households$size, households$type, mean
+)[parcels$type]
+
+# recalculate the adjusted redistribution results
+estimate_redist_adj <- redist_downup(
+  tracts, parcels, block_groups, map_tr_to_parcel, map_bg_to_parcel,
+  weight = "Residents"
+)
+mean(abs(estimate_redist_adj$Total - block_groups$Total))
+```
+
 ## Initial Weights
 
 As a baseline, we can calculate a set of proportions for each PUMA,
@@ -880,9 +917,9 @@ write.csv(error, paste0(base_dir, "/results_tract.csv"), row.names = FALSE)
 
 Full results are presented in a data site: [redistribution_arlington](https://uva-bi-sdad.github.io/redistribution_arlington)
 
-## Alternate Geolayers
+## Alternate Geolevels
 
-So far, we've used the same geolayer-related test-case to assess
+So far, we've used the same geolevel-related test-case to assess
 our methods, but this may have an effect in itself. As an alternative,
 we might abandon canonical tracts in favor of randomly agglutinated
 block groups.
@@ -1021,7 +1058,7 @@ for (var in c("sex_female", "race_native", "income_lt50", "Average")) {
 
 ## Simulated Populations
 
-So far, we've used the same data at different initial geolayers
+So far, we've used the same data at different initial geolevels
 as a way to introduce error while still having a known target to
 measure error from. This may have the benefit of retaining some properties
 of the data that affect our methods in unknown ways, but the down side is
@@ -1203,12 +1240,20 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
   ps$OBJECTID <- population$regions$id
   ps$geoid <- map_parcel_to_bg[population$regions$id]
   ps$Unit_Type <- c("MULTI", "SFD", "SFA")[ps$building_type]
-  ps$Residents <- ps$Total * 5 - (ps$Total == 1) * 4
+
+  ps$PUMA <- structure(
+    pums$crosswalk$PUMA5CE,
+    names = pums$crosswalk$GEOID
+  )[substring(ps$geoid, 1, 11)]
+  ps$single_family_home <- ps$Unit_Type != "MULTI"
+  ps$type <- do.call(
+    paste0, ps[, c("PUMA", "single_family_home"), drop = TRUE]
+  )
 
   vdata <- lapply(
     structure(pumas_focal, names = pumas_focal),
     function(puma) {
-      ps <- ps[ps$id %in% data[[puma]]$parcels$OBJECTID, ]
+      ps <- ps[ps$PUMA == puma, ]
       su <- which(individuals$region %in% ps$id)
       list(
         map = map_bg_to_parcel,
@@ -1219,6 +1264,17 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
     }
   )
   ps <- do.call(rbind, lapply(vdata, "[[", "parcels"))
+  individuals <- do.call(rbind, lapply(vdata, "[[", "individuals"))
+  hh <- individuals[!duplicated(individuals$SERIALNO), ]
+  hh$PUMA <- structure(
+    pums$crosswalk$PUMA5CE,
+    names = pums$crosswalk$GEOID
+  )[substring(hh$geoid, 1, 11)]
+  hh$single_family_home <- hh$building_type != "MULTI"
+  hh$type <- do.call(paste0, hh[, c("PUMA", "single_family_home")])
+  hh$size <- table(individuals$SERIALNO)[as.character(hh$SERIALNO)]
+  ps$Residents <- ps$Total * 2 + tapply(hh$size, hh$type, mean)[ps$type]
+
   vestimates <- list(
     Prop = redistribute(
       bg, ps, map_bg_to_parcel,
