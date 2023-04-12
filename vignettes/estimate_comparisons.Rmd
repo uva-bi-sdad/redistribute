@@ -304,7 +304,7 @@ estimates of number of people per living unit:
 
 ```{r}
 # 2.5 for multi-unit parcels, 5.5 for single-unit parcels
-parcels$Residents <- parcels$Total * 2.5 + (parcels$Total == 1) * 3
+parcels$Residents <- parcels$Total * (2.5 + (parcels$Total == 1) * 3)
 
 # now see if this improved our redistribution
 estimate_redist_adj <- redist_downup(
@@ -547,30 +547,17 @@ Before the new methods, we can also update our heuristic adjustment
 to the proportional redistribution method with PUMS information:
 
 ```{r}
-# get average household size for single family versus other
-# home types within each PUMA
-pums$household$size <- table(pums$person$SERIALNO)[pums$household$SERIALNO]
+# make single-family-home indicators
 pums$household$single_family_home <- pums$household$building_type != "MULTI"
-
-households <- pums$household[pums$household$PUMA %in% pumas_focal, ]
-households$type <- do.call(
-  paste0, households[, c("PUMA", "single_family_home")]
-)
-
-# apply to parcels
-parcels$PUMA <- structure(
-  pums$crosswalk$PUMA5CE,
-  names = pums$crosswalk$GEOID
-)[substring(parcels$geoid, 1, 11)]
 parcels$single_family_home <- parcels$Unit_Type != "MULTI"
-parcels$type <- do.call(
-  paste0, parcels[, c("PUMA", "single_family_home"), drop = TRUE]
-)
 
-# update resident estimate
-parcels$Residents <- parcels$Total * 2 + tapply(
-  households$size, households$type, mean
-)[parcels$type]
+# update resident estimates with average household size for
+# single family versus other home types within the county
+pums$household$size <- table(pums$person$SERIALNO)[pums$household$SERIALNO]
+households <- pums$household[pums$household$PUMA %in% pumas_focal, ]
+parcels$Residents <- parcels$Total * tapply(
+  households$size, households$single_family_home, mean
+)[as.character(parcels$single_family_home)]
 
 # recalculate the adjusted redistribution results
 estimate_redist_adj <- redist_downup(
@@ -1266,14 +1253,11 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
   ps <- do.call(rbind, lapply(vdata, "[[", "parcels"))
   individuals <- do.call(rbind, lapply(vdata, "[[", "individuals"))
   hh <- individuals[!duplicated(individuals$SERIALNO), ]
-  hh$PUMA <- structure(
-    pums$crosswalk$PUMA5CE,
-    names = pums$crosswalk$GEOID
-  )[substring(hh$geoid, 1, 11)]
   hh$single_family_home <- hh$building_type != "MULTI"
-  hh$type <- do.call(paste0, hh[, c("PUMA", "single_family_home")])
   hh$size <- table(individuals$SERIALNO)[as.character(hh$SERIALNO)]
-  ps$Residents <- ps$Total * 2 + tapply(hh$size, hh$type, mean)[ps$type]
+  ps$Residents <- ps$Total * tapply(
+    hh$size, hh$single_family_home, mean
+  )[as.character(ps$single_family_home)]
 
   vestimates <- list(
     Prop = redistribute(
