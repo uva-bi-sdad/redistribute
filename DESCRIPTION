@@ -18,7 +18,7 @@ Roxygen: list(old_usage = TRUE)
 Suggests: 
   knitr,
   rmarkdown,
-  testthat (>= 3.0.0)
+  testthat (>= 3.0.0),
+  tidycensus
 Config/testthat/edition: 3
 LinkingTo: Rcpp, RcppParallel
-SystemRequirements: C++17

@@ -86,7 +86,7 @@ Distribute data from a source frame to a target frame.
 }
 \examples{
 # minimal example
-source <- c(a = 1, b = 2)
+source <- data.frame(a = 1, b = 2)
 target <- 1:5
 (redistribute(source, target, verbose = TRUE))
 

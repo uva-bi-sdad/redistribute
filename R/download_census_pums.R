@@ -1,7 +1,7 @@
 #' Download U.S. Census Microdata
 #'
 #' Download and load U.S. census American Community Survey (ACS) Public Use Microdata Samples (PUMS):
-#' [census.gov/programs-surveys/acs/microdata.html](https://www.census.gov/programs-surveys/acs/microdata.html)
+#' \href{https://www.census.gov/programs-surveys/acs/microdata.html}{census.gov/programs-surveys/acs/microdata.html}
 #'
 #'
 #' @param dir Directory in which to save the file(s).
@@ -12,7 +12,7 @@
 #' not specified, will fall back to the 5-year file if the 1-year file is not available.
 #' @param calculate_error Logical; if \code{TRUE}, will calculate standard errors for each variable using
 #' the Successive Difference Replicate Formula from the
-#' [PUMS handbook](https://www.census.gov/programs-surveys/acs/library/handbooks/pums.html).
+#' \href{https://www.census.gov/programs-surveys/acs/library/handbooks/pums.html}{census.gov/programs-surveys/acs/library/handbooks/pums.html}.
 #' @param crosswalk Logical; if \code{FALSE}, will not retrieve the PUMA relationship files for associating
 #' Census tracts with PUM areas. This will be treated as \code{TRUE} if
 #' \code{geoids} is specified.

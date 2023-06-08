@@ -104,35 +104,6 @@ block_groups <- block_groups[block_groups$GEOID %in% population$GEOID, ]
 population <- population[block_groups$GEOID, ]
 st_geometry(population) <- block_groups$geometry
 population$Overall <- population$TOTAL.POPULATION_Total
-
-# prepare a map
-library(leaflet)
-pal <- colorNumeric(scico::scico(255, palette = "lajolla"), population$Overall)
-map <- leaflet(
-  population,
-  options = leafletOptions(attributionControl = FALSE)
-) |>
-  addProviderTiles("CartoDB.Positron") |>
-  addScaleBar("bottomleft") |>
-  addControl("Total Population", "topright") |>
-  addLayersControl(
-    position = "topleft", overlayGroups = "Block Groups",
-    baseGroups = c(
-      "Zip Codes", "Parcels -> Zip Codes", "Block Groups -> Zip Codes",
-      "Block Groups -> Parcels -> Zip Codes"
-    )
-  ) |>
-  addLegend(
-    "bottomright", pal, ~Overall,
-    title = "Block Groups", opacity = 1
-  ) |>
-  addPolygons(
-    fillColor = ~ pal(Overall), fillOpacity = 1, weight = 1,
-    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Block Groups", label = ~ paste(
-      GEOID, "Population:", round(Overall, 3)
-    )
-  )
 ```
 
 This population information is provided at the Census Block Group level at the lowest,
@@ -194,13 +165,39 @@ parcel_zipcode_population <- redistribute(
 
 Now we can compare the estimated total population of these different methods
 with those provided:
-```{r}
+```{r, fig.height=4.5, fig.width=8.1}
+library(leaflet)
 all_values <- c(
   zipcodes$POPULATION, zipcode_population$Overall,
   bg_parcel_zipcode_population$Overall, parcel_zipcode_population$CURRE_POPUL
 )
+pal <- colorNumeric(scico::scico(255, palette = "lajolla"), population$Overall)
 pal_zip <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
-map |>
+leaflet(
+  population,
+  options = leafletOptions(attributionControl = FALSE)
+) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addScaleBar("bottomleft") |>
+  addControl("Total Population", "topright") |>
+  addLayersControl(
+    position = "topleft", overlayGroups = "Block Groups",
+    baseGroups = c(
+      "Zip Codes", "Parcels -> Zip Codes", "Block Groups -> Zip Codes",
+      "Block Groups -> Parcels -> Zip Codes"
+    )
+  ) |>
+  addLegend(
+    "bottomright", pal, ~Overall,
+    title = "Block Groups", opacity = 1
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(Overall), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Block Groups", label = ~ paste(
+      GEOID, "Population:", round(Overall, 3)
+    )
+  ) |>
   addPolygons(
     data = zipcodes,
     fillColor = ~ pal_zip(POPULATION), fillOpacity = .8, weight = 1,

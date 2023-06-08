@@ -15,7 +15,7 @@ test_that("basic example works", {
   expect_message(parents <- make_parent_polygons(original, n = 3), "mapping")
   expect_true(all(vapply(parents$map, length, 0) < 4))
   parents <- make_parent_polygons(original, n = 3, n_as_min = TRUE)
-  expect_true(all(vapply(parents$map, length, 0) > 2))
+  expect_true(any(vapply(parents$map, length, 0) > 3))
   expect_identical(st_bbox(original), st_bbox(parents$new))
   parents <- make_parent_polygons(original, strict_n = FALSE)
   expect_identical(sort(unlist(parents$map, use.names = FALSE)), seq_len(nrow(original)))

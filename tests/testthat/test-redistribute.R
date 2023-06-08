@@ -1,6 +1,6 @@
 test_that("minimal example works", {
   expect_identical(
-    redistribute(1:3, 1:5), data.frame(id = as.character(1:5), V1 = 1 / 5, V2 = 2 / 5, V3 = 3 / 5)
+    redistribute(t(1:3), 1:5), data.frame(id = as.character(1:5), V1 = 1 / 5, V2 = 2 / 5, V3 = 3 / 5)
   )
 })
 
@@ -147,5 +147,6 @@ test_that("intersect map work", {
     source_id = "id", target_id = "id", return_map = TRUE, make_intersect_map = TRUE
   )
   expect_equal(redistribute(mres[, 1:4], source, map = agg_map, source_id = "id", target_id = "id"), mares)
+  expect_equal(redistribute(mres[, 1:4], source, map = map, source_id = "id", target_id = "id"), mares)
   expect_equal(redistribute(mres[, 1:4], source, source_id = "id", target_id = "id", make_intersect_map = TRUE), mares)
 })

@@ -20,3 +20,21 @@ navbar:
         href: articles/introduction.html
       - text: Method Comparisons
         href: articles/estimate_comparisons.html
+
+reference:
+- title: Core Functions
+  desc: Primary functions underlying more specific methods.
+  contents:
+  - redistribute
+
+- title: Methods
+  desc: High-level functions to caluclate specific methods.
+  contents:
+  - starts_with("redistribute_")
+
+- title: Utilities
+  desc: Functions to help with other tasks, such as collecting data or setting up test cases.
+  contents:
+  - starts_with("download_")
+  - starts_with("generate_")
+  - starts_with("make_")
