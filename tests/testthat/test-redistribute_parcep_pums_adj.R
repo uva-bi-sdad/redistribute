@@ -11,7 +11,8 @@ test_that("example works", {
     geography = "tract",
     output = "wide",
     variables = c(total = "B01001_001"),
-    geometry = TRUE
+    geometry = TRUE,
+    cache_table = TRUE
   )
   parcel_file <- paste0(dir, "/parcels.rds")
   if (!file.exists(parcel_file)) {
@@ -31,10 +32,10 @@ test_that("example works", {
 
   wrapper <- redistribute_parcel_pums_adj(
     tracts[, -2], parcels, pums,
-    map = map_tr_to_parcel, target_id = "OBJECTID", target_total = "Total_Units"
+    map = map_tr_to_parcel, target_id = "OBJECTID"
   )
 
-  residents <- parcels$Total * tapply(
+  residents <- parcels$Total_Units * tapply(
     table(pums$person$SERIALNO)[pums$household$SERIALNO],
     pums$household$BLD %in% c("02", "03"),
     mean,

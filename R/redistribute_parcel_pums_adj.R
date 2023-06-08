@@ -59,7 +59,7 @@
 #'   # using a resident-estimate-adjusted weight
 #'   parcels_filled <- redistribute_parcel_pums_adj(
 #'     tracts[, -2], parcels, pums,
-#'     target_total = "Total_Units", map = map_tr_to_parcel, target_id = "OBJECTID"
+#'     map = map_tr_to_parcel, target_id = "OBJECTID"
 #'   )
 #'
 #'   # this can also be calculated with the underlying function
@@ -71,7 +71,7 @@
 #'     mean,
 #'     na.rm = TRUE
 #'   )
-#'   residents <- parcels$Total * household_size[
+#'   residents <- parcels$Total_Units * household_size[
 #'     as.character(parcels$Unit_Type != "MULTI")
 #'   ]
 #'
