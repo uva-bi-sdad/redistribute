@@ -778,6 +778,85 @@ est_twostep <- function(source, target, individuals) {
 estimate_twostep <- apply_method(data, est_twostep)
 ```
 
+## N Step Raking
+
+We can take the two-step method further by repeating the process to
+try and better fit both the household and individual data:
+
+```{r, warning=FALSE}
+est_nstep <- function(source, target, individuals) {
+  individuals$weight <- individuals$PWGTP
+  all <- individuals
+  iter <- function() {
+    individuals <- individuals[!duplicated(individuals$SERIALNO), ]
+    # step 1: initial weights at household level
+    totals <- list(
+      income_cat = unlist(source[, grep("^income_", colnames(source))]),
+      status = structure(
+        colSums(target[, vars_units[-1]]),
+        names = c("RENTER", "OWNER")
+      ),
+      building_type = tapply(rowSums(target[, vars_units[-1]]), target$Unit_Type, sum)
+    )
+    rake_prep()
+    household_totals <- totals
+    capture.output(initial <- tryCatch(
+      anesrake(
+        totals, individuals, individuals$SERIALNO,
+        individuals$weight / individuals$PWGTP * individuals$WGTP,
+        pctlim = .001
+      )$weightvec,
+      error = function(e) {
+        warning(e$message)
+        structure(
+          individuals$weight / individuals$PWGTP * individuals$WGTP,
+          names = individuals$SERIALNO
+        )
+      }
+    ))
+    all$weight <- initial[as.character(all$SERIALNO)]
+    all <- all[!is.na(all$weight), ]
+    individuals <- all
+    # step 2: adjust at person level
+    totals <- lapply(
+      structure(names(vars_list)[1:2], names = names(vars_list)[1:2]),
+      function(n) unlist(source[, vars_list[[n]]])
+    )
+    rake_prep()
+    initial <- individuals$weight
+    capture.output(individuals$weight <- tryCatch(
+      anesrake(
+        totals, individuals, individuals$ID,
+        individuals$PWGTP * initial / individuals$WGTP,
+        pctlim = .001
+      )$weightvec[as.character(individuals$ID)],
+      error = function(e) {
+        warning(e$message)
+        individuals$PWGTP * initial / individuals$WGTP
+      }
+    ))
+    hh <- individuals[!duplicated(individuals$SERIALNO), ]
+    weight <- hh$PWGTP / hh$weight * hh$WGTP
+    list(
+      error = mean(vapply(names(household_totals), function(v) {
+        mean((household_totals[[v]] - tapply(weight, hh[[v]], sum) / sum(weight))^2)
+      }, 0)),
+      data = individuals
+    )
+  }
+  previous_error <- 0
+  for (i in 1:20) {
+    step <- iter()
+    individuals <- step$data
+    if (step$error < .001 || abs(previous_error - step$error) < .0005) break
+    previous_error <- step$error
+  }
+  environment(make_estimates) <- environment()
+  make_estimates()
+}
+estimate_nstep <- apply_method(data, est_nstep)
+```
+
 ## Generalized Raking
 
 The two-step approach still mainly focuses on better aligning the
@@ -871,6 +950,7 @@ error <- do.call(rbind, lapply(structure(pvars, names = pvars), function(var) {
     Baseline = estimate_baseline$block_groups[[var]],
     Rake = estimate_rake$block_groups[[var]],
     "Rake 2 Step" = estimate_twostep$block_groups[[var]],
+    "Rake N Step" = estimate_nstep$block_groups[[var]],
     "Rake General" = estimate_grake$block_groups[[var]]
   )
   colMeans(abs(d - block_groups[[var]]))
@@ -889,6 +969,7 @@ error <- do.call(cbind, lapply(structure(pvars, names = pvars), function(var) {
     pums_baseline = estimate_baseline$block_groups[[var]],
     pums_1step = estimate_rake$block_groups[[var]],
     pums_2step = estimate_twostep$block_groups[[var]],
+    pums_nstep = estimate_nstep$block_groups[[var]],
     pums_general = estimate_grake$block_groups[[var]]
   )
   colnames(d) <- paste0(var, ".", colnames(d))
@@ -952,6 +1033,7 @@ apply_altgeo <- function(run = NULL, return_full = FALSE) {
     Baseline = apply_method(vdata, est_baseline),
     Rake = apply_method(vdata, est_rake),
     "Rake 2 Step" = apply_method(vdata, est_twostep),
+    "Rake N Step" = apply_method(vdata, est_nstep),
     "Rake General" = apply_method(vdata, est_grake)
   )
   verror <- do.call(rbind, lapply(
@@ -1271,6 +1353,7 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
     Baseline = apply_method(vdata, est_baseline, parcel_only = TRUE),
     Rake = apply_method(vdata, est_rake, parcel_only = TRUE),
     "Rake 2 Step" = apply_method(vdata, est_twostep, parcel_only = TRUE),
+    "Rake N Step" = apply_method(vdata, est_nstep, parcel_only = TRUE),
     "Rake General" = apply_method(vdata, est_grake, parcel_only = TRUE)
   )
   actual <- population$summary[ps$id, ]
