@@ -68,7 +68,9 @@ download_census_pums <- function(dir, state, year = 2021, level = "both", one_ye
   folder <- paste0(tdir, "pums_", state, "/", year, "/", summary, "/")
   dir.create(folder, FALSE, TRUE)
   res <- list(year = year, state = state, dictionary = NULL, household = NULL, person = NULL)
-  dict_json <- paste0(folder, paste0("PUMS_Data_Dictionary_", year, ".json"))
+  dict_json <- paste0(folder, paste0(
+    "PUMS_Data_Dictionary_", if (one_year) year else paste0(year - 4, "-", year), ".json"
+  ))
   if (file.exists(dict_json)) {
     res$dictionary <- read_json(dict_json, simplifyVector = TRUE)
   } else {
@@ -170,8 +172,7 @@ download_census_pums <- function(dir, state, year = 2021, level = "both", one_ye
     }
   }
   if (crosswalk || !is.null(geoids)) {
-    decade <- paste0(substring(year, 1, 3), "0")
-    url <- if (decade == "2020") {
+    url <- if (as.numeric(year) > if (one_year) 2019 else 2024) {
       "https://www2.census.gov/geo/docs/maps-data/data/rel2020/2020_Census_Tract_to_2020_PUMA.txt"
     } else {
       "https://www2.census.gov/geo/docs/maps-data/data/rel/2010_Census_Tract_to_2010_PUMA.txt"
@@ -196,7 +197,7 @@ download_census_pums <- function(dir, state, year = 2021, level = "both", one_ye
             )
           }
           for (set in c("household", "person")) {
-            su <- formatC(as.numeric(res[[set]]$PUMA), width = 5, flag = 0) %in% pids
+            su <- res[[set]]$PUMA %in% pids
             res[[set]] <- res[[set]][su, ]
             set_error <- paste0(set, "_error")
             if (set_error %in% names(res)) res[[set_error]] <- res[[set_error]][su, ]
