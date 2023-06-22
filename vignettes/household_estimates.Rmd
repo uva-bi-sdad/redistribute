@@ -29,6 +29,8 @@ library(knitr)
 library(readr)
 library(tidycensus)
 library(anesrake)
+library(leaflet)
+library(rmapshaper)
 base_dir <- "../household_estimates"
 if (!dir.exists(base_dir)) base_dir <- "../../household_estimates"
 options(tigris_use_cache = TRUE)
@@ -48,19 +50,15 @@ dir.create(base_dir, FALSE)
 We can start by directly redistributing block group values to zipcodes based on
 their geometries.
 
-First, we need to get our *source* block group data:
+First, we need to get our **source** block group data (American Community Survey 5-year estimates, 2017-2021):
 ```{r, warn=FALSE}
 counties <- c("059", "600")
-
 variables <- c(
   total = "B25006_001",
   race_white = "B25006_002",
   race_black = "B25006_003",
   race_native = "B25006_004",
   race_asian = "B25006_005",
-  tenure_total = "B25003_001",
-  tenure_owner = "B25003_002",
-  tenure_renter = "B25003_003",
   income_total = "B19001_001",
   income_lt10 = "B19001_002",
   income_10_15 = "B19001_003",
@@ -109,7 +107,7 @@ income_vars_select <- c(
 )
 ```
 
-And our ultimate *target* zipcode geometries:
+And our ultimate **target** zipcode geometries:
 ```{r}
 library(sf)
 zipcode_file <- paste0(base_dir, "/zipcode_va_fairfax.rds")
@@ -126,8 +124,12 @@ zipcodes <- readRDS(zipcode_file)
 Now we can use the `redistribute` function to make zipcode-level estimates:
 ```{r}
 library(redistribute)
-estimates_direct <- redistribute(
+map_bg_to_zipcodes <- estimates_direct <- redistribute(
   block_groups, zipcodes,
+  target_id = "ZIPCODE", return_map = TRUE
+)
+estimates_direct <- redistribute(
+  block_groups, zipcodes, map_bg_to_zipcodes,
   target_id = "ZIPCODE"
 )
 ```
@@ -142,15 +144,23 @@ mean(abs(estimates_direct$Total - zipcodes$HOUSEHOLDS))
 cor(estimates_direct$Total, zipcodes$HOUSEHOLDS)
 ```
 
+We could also use these zipcode-level estimates as weights to improve our redistribution:
+```{r}
+estimates_direct_weighted <- redistribute(
+  block_groups, zipcodes, map_bg_to_zipcodes,
+  target_id = "ZIPCODE", weight = "HOUSEHOLDS"
+)
+mean(abs(estimates_direct_weighted$Total - zipcodes$HOUSEHOLDS))
+cor(estimates_direct_weighted$Total, zipcodes$HOUSEHOLDS)
+```
+
 # Parcels
 
-To potentially improve these estimates, we can use parcel-level information
-to disaggregate down from block groups to parcels, then from there aggregate up to zip codes:
+To potentially improve these estimates, we can use [parcel-level housing unit information](https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::current-housing-units/about)
+to disaggregate down from block groups to parcels, then aggregate up to zip codes:
 
-First, we need to get parcel data with housing unit counts:
+First, we need to get the parcel data with housing unit counts:
 ```{r}
-## https://data-fairfaxcountygis.opendata.arcgis.com/datasets/
-## Fairfaxcountygis::current-housing-units
 parcel_file <- paste0(base_dir, "/parcel_va_fairfax.rds")
 if (!file.exists(parcel_file)) {
   parcels <- st_read(paste0(
@@ -166,10 +176,6 @@ colnames(parcels)[colnames(parcels) == "CURRE_UNIT"] <- "Total"
 parcels$Unit_Type <- "MULTI"
 parcels$Unit_Type[parcels$HOUSI_UNIT_TYPE == "SF"] <- "SFD"
 parcels$Unit_Type[parcels$HOUSI_UNIT_TYPE %in% c("TH", "MP", "DX")] <- "SFA"
-parcels$Renter_Occupied <- parcels$Total * (parcels$LUC %in% c(
-  "033", "036", "040", "042", "044", "046"
-))
-parcels$Owner_Occupied <- parcels$Total - parcels$Renter_Occupied
 
 parcels$PIN <- as.character(parcels$PIN)
 parcels <- parcels[parcels$YEAR_BUILT <= 2021 & !duplicated(parcels$PIN), ]
@@ -179,7 +185,7 @@ Then, we can disaggregate down from block groups:
 ```{r}
 map_bg_to_parcel <- redistribute(
   block_groups, parcels,
-  target_id = "PIN", return_map = TRUE, overlaps = "first"
+  target_id = "PIN", return_map = TRUE
 )
 parcels$geoid <- structure(
   rep(names(map_bg_to_parcel), vapply(map_bg_to_parcel, length, 0)),
@@ -188,16 +194,25 @@ parcels$geoid <- structure(
 
 estimates_parcels <- redistribute(
   block_groups, parcels, map_bg_to_parcel,
-  target_id = "PIN"
+  target_id = "PIN", weight = "Total", default_value = 0
 )
 ```
 
-Since household estimates are also available at the parcel level, we can
-first see how close we got to those:
+Note that some block groups contain no parcels despite having
+non-zero populations, so our parcel-based estimates will be off total
+(there are `r sum(block_groups$Total) - sum(estimates_parcels$Total)` people unaccounted for by parcels):
+```{r}
+block_groups[
+  block_groups$GEOID %in% names(which(vapply(map_bg_to_parcel, length, 0) == 0)),
+  c("GEOID", "Total"),
+  drop = TRUE
+]
+```
+
+Since [household estimates](https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::current-households/about)
+are also available at the parcel level, we can first see how close we got to those:
 ```{r}
 # download parcel-level household data
-## https://data-fairfaxcountygis.opendata.arcgis.com/datasets/
-## Fairfaxcountygis::current-households
 parcel_hh_file <- paste0(base_dir, "/parcel_hh_va_fairfax.rds")
 if (!file.exists(parcel_hh_file)) {
   parcels_hh <- st_read(paste0(
@@ -215,11 +230,21 @@ mean(abs(estimates_parcels$Total - parcels_hh$CURRE_HHLDS), na.rm = TRUE)
 cor(estimates_parcels$Total, parcels_hh$CURRE_HHLDS, use = "complete.obs")
 ```
 
+Despite the under-coverage of block groups by parcels, the estimated number of households
+at the parcel level is slightly higher (which could also be influenced by the difference in time):
+```{r}
+totals <- c(
+  "Block Groups" = sum(block_groups$Total),
+  Parcels = sum(parcels_hh$CURRE_HHLDS, na.rm = TRUE)
+)
+data.frame(Households = c(totals, Difference = totals[[2]] - totals[[1]]))
+```
+
 Now we can aggregate from the parcel-level to zipcodes:
 ```{r}
 map_parcel_to_zip <- redistribute(
-  estimates_parcels, zipcodes,
-  source_id = "id", target_id = "ZIPCODE", return_map = TRUE
+  parcels, zipcodes,
+  source_id = "PIN", target_id = "ZIPCODE", return_map = TRUE
 )
 estimates_downup <- redistribute(
   estimates_parcels, zipcodes, map_parcel_to_zip,
@@ -228,6 +253,48 @@ estimates_downup <- redistribute(
 
 mean(abs(estimates_downup$Total - zipcodes$HOUSEHOLDS))
 cor(estimates_downup$Total, zipcodes$HOUSEHOLDS)
+```
+
+As in the direct case, we can also see how much of an improvement weighting by
+household estimates might make:
+```{r}
+# recalculate the parcel estimates
+estimates_parcels_hh <- redistribute(
+  block_groups, parcels_hh, map_bg_to_parcel,
+  target_id = "PIN", weight = "CURRE_HHLDS"
+)
+
+mean(abs(estimates_parcels_hh$Total - parcels_hh$CURRE_HHLDS), na.rm = TRUE)
+cor(estimates_parcels_hh$Total, parcels_hh$CURRE_HHLDS, use = "complete.obs")
+
+# reaggregate to zipcodes
+estimates_downup_hh <- redistribute(
+  estimates_parcels_hh, zipcodes, map_parcel_to_zip,
+  source_id = "id", target_id = "ZIPCODE", default_value = 0
+)
+
+mean(abs(estimates_downup_hh$Total - zipcodes$HOUSEHOLDS))
+cor(estimates_downup_hh$Total, zipcodes$HOUSEHOLDS)
+```
+
+The parcel-level household estimates differ very little from the unit counts,
+so it makes less of a difference in this case:
+```{r}
+mean(abs(parcels$Total - parcels_hh$CURRE_HHLDS), na.rm = TRUE)
+cor(parcels$Total, parcels_hh$CURRE_HHLDS, use = "complete.obs")
+```
+
+Without knowing anything about how the household estimates were made for
+these parcels and zipcodes, it is interesting to note that aggregated parcel estimates
+nearly perfectly line up with zipcode estimates.
+```{r}
+estimates_downup_original <- redistribute(
+  parcels_hh, zipcodes, map_parcel_to_zip,
+  source_id = "PIN", target_id = "ZIPCODE", default_value = 0
+)
+
+mean(abs(estimates_downup_original$CURRE_HHLDS - zipcodes$HOUSEHOLDS))
+cor(estimates_downup_original$CURRE_HHLDS, zipcodes$HOUSEHOLDS)
 ```
 
 # Parcels + Pums
@@ -262,9 +329,6 @@ households <- households[!is.na(households$BLD) & !is.na(households$TEN), ]
 households$building_type <- "MULTI"
 households$building_type[households$BLD == "02"] <- "SFD"
 households$building_type[households$BLD == "03"] <- "SFA"
-
-households$status <- "RENTER"
-households$status[households$TEN %in% 1:2] <- "OWNER"
 ```
 
 Then we'll set set some things up to calculate estimates from microdata:
@@ -272,11 +336,9 @@ Then we'll set set some things up to calculate estimates from microdata:
 # define variables of interest
 vars_house <- c(
   ID = "SERIALNO", weight = "WGTP", type = "building_type",
-  status = "status", income_cat = "income_cat", race_cat = "race_cat"
+  income_cat = "income_cat", race_cat = "race_cat"
 )
-vars_units <- c(
-  type = "Unit_Type", renters = "Renter_Occupied", owners = "Owner_Occupied"
-)
+vars_units <- c(type = "Unit_Type")
 
 ## get their levels
 return_vars <- c("income_cat", "race_cat")
@@ -294,7 +356,7 @@ data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
       drop = TRUE
     ],
     parcels = parcels[
-      substring(parcels$geoid, 1, 11) %in% ids, c("geoid", "PIN", vars_units),
+      substring(parcels$geoid, 1, 11) %in% ids, c("geoid", "PIN", "Total", vars_units),
       drop = TRUE
     ],
     map = map_bg_to_parcel
@@ -302,7 +364,7 @@ data <- lapply(structure(pumas_focal, names = pumas_focal), function(puma) {
 })
 
 # function to apply each method to the data
-apply_method <- function(data, method, parcel_only = FALSE, rescale = FALSE) {
+apply_method <- function(data, method, rescale = FALSE) {
   p <- do.call(rbind, lapply(data, function(set) {
     set$source <- st_drop_geometry(set$source)
     do.call(rbind, lapply(unique(set$source$GEOID), function(id) {
@@ -334,45 +396,32 @@ apply_method <- function(data, method, parcel_only = FALSE, rescale = FALSE) {
       }
     }))
   }))
-  if (parcel_only) {
-    p
-  } else {
-    list(parcels = p, zipcode = redistribute(
-      p[, -1], zipcodes, map_parcel_to_zip,
-      source_id = "PIN", target_id = "ZIPCODE", default_value = 0
-    ))
-  }
+  redistribute(
+    p[, -1], zipcodes, map_parcel_to_zip,
+    source_id = "PIN", target_id = "ZIPCODE", default_value = 0
+  )
 }
 
 # function to calculate estimates from weights
 make_estimates <- function() {
   do.call(rbind, lapply(unique(target$Unit_Type), function(type) {
-    d <- target[
-      target$Unit_Type == type, c("PIN", "Renter_Occupied", "Owner_Occupied")
-    ]
+    d <- target[target$Unit_Type == type, c("PIN", "Total")]
     nd <- nrow(d)
-    colnames(d)[-1] <- c("RENTER", "OWNER")
     i <- households[
-      households$building_type == type, c("weight", "status", return_vars)
+      households$building_type == type, c("weight", return_vars)
     ]
-    as.data.frame(Reduce("+", lapply(
-      (if (is.factor(i$status)) levels else unique)(i$status),
-      function(s) {
-        ii <- i[i$status == s, ]
-        weight_total <- sum(ii$weight)
-        do.call(cbind, lapply(return_vars, function(cat) {
-          props <- tapply(ii$weight, ii[[cat]], sum) / weight_total
-          props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
-          props[is.na(props)] <- 0
-          props <- props[vars_list[[cat]]]
-          matrix(
-            d[[s]] * rep(props, each = nd),
-            nd,
-            dimnames = list(d$PIN, names(props))
-          )
-        }))
-      }
-    )))
+    weight_total <- sum(i$weight)
+    as.data.frame(do.call(cbind, lapply(return_vars, function(cat) {
+      props <- tapply(i$weight, i[[cat]], sum) / weight_total
+      props[vars_list[[cat]][!vars_list[[cat]] %in% names(props)]] <- 0
+      props[is.na(props)] <- 0
+      props <- props[vars_list[[cat]]]
+      matrix(
+        d$Total * rep(props, each = nd),
+        nd,
+        dimnames = list(d$PIN, names(props))
+      )
+    })))
   }))
 }
 ```
@@ -392,19 +441,20 @@ estimates_pums <- apply_method(data, method_pums)
 Here we're not estimating total population, but we might calculate it from
 each set of variables to measure against the provided zipcode-level totals:
 ```{r}
-estimates_pums$zipcode$Total <- rowSums(estimates_pums$zipcode[
-  , grep("^race_", colnames(estimates_pums$zipcode)),
+estimates_pums$Total <- rowSums(estimates_pums[
+  , grep("^race_", colnames(estimates_pums)),
   drop = TRUE
 ])
-mean(abs(estimates_pums$zipcode$Total - zipcodes$HOUSEHOLDS))
-cor(estimates_pums$zipcode$Total, zipcodes$HOUSEHOLDS)
+
+mean(abs(estimates_pums$Total - zipcodes$HOUSEHOLDS))
+cor(estimates_pums$Total, zipcodes$HOUSEHOLDS)
 ```
 
 # Parcels + Raked PUMS
 
-In the previous example, we did not use the ACS summary information
-to make estimates. We might incorporate those summaries by
-adjusting the initial PUMS weights to fit the totals
+In the previous example, we did not use the ACS summary information to make estimates.
+
+We might incorporate those summaries by adjusting the initial PUMS weights to fit the totals
 within each block group:
 ```{r, warning=FALSE}
 library(anesrake)
@@ -432,7 +482,6 @@ method_rake <- function(source, target, households) {
     function(n) unlist(source[, vars_list[[n]]])
   )
   rake_prep()
-  households$status <- as.factor(households$status)
   households$building_type <- as.factor(households$building_type)
   households$income_cat <- as.factor(households$income_cat)
   capture.output(households$weight <- tryCatch(
@@ -453,40 +502,62 @@ estimates_rake <- apply_method(data, method_rake)
 
 Totals with the adjusted weights will be the same as before:
 ```{r}
-estimates_rake$zipcode$Total <- rowSums(estimates_rake$zipcode[
-  , grep("^race_", colnames(estimates_rake$zipcode)),
+estimates_rake$Total <- rowSums(estimates_rake[
+  , grep("^race_", colnames(estimates_rake)),
   drop = TRUE
 ])
-all.equal(estimates_rake$zipcode$Total, estimates_pums$zipcode$Total)
+all.equal(estimates_rake$Total, estimates_pums$Total)
 ```
 
-But the spread across categories will be slightly different:
+But the spread across categories will be a little different:
 ```{r}
 kable(data.frame(
   mae = colMeans(abs(
-    estimates_pums$zipcode[, vars, drop = TRUE] -
-      estimates_rake$zipcode[, vars, drop = TRUE]
+    estimates_pums[, vars, drop = TRUE] -
+      estimates_rake[, vars, drop = TRUE]
   )),
   cor = diag(cor(
-    estimates_pums$zipcode[, vars, drop = TRUE],
-    estimates_rake$zipcode[, vars, drop = TRUE]
+    estimates_pums[, vars, drop = TRUE],
+    estimates_rake[, vars, drop = TRUE]
   ))
 ), digits = 4)
 ```
 
+These differences are much smaller when the estimates are rescaled -- rescaling
+suppresses much of the difference the raking makes.
+
 # Comparison
 
+We'll start by looking at the largest category variable (race: white) to compare the methods.
+
+We can first check the totals between methods:
+```{r}
+data <- cbind(
+  Direct = estimates_direct$race_white,
+  DirectHH = estimates_direct_weighted$race_white,
+  DownUp = estimates_downup$race_white,
+  DownUpHH = estimates_downup_hh$race_white,
+  Pums = estimates_pums$race_white,
+  Rake = estimates_rake$race_white
+)
+data.frame(
+  "Race: White" = c(Original = sum(block_groups$race_white), colSums(data)),
+  check.names = FALSE
+)
+```
+
+Only the direct methods naturally recover the original totals, because the other
+methods (a) depend on parcel coverage of block groups, and (b) the PUMS-based
+estimates are not guaranteed to recover category-level totals.
+
+We can also look at these estimates on a map:
 ```{r, fig.height=4.5, fig.width=8.1}
 library(leaflet)
-all_values <- c(
-  estimates_direct$race_white,
-  estimates_downup$race_white,
-  estimates_pums$zipcode$race_white,
-  estimates_rake$zipcode$race_white
-)
+mapdata <- cbind(rmapshaper::ms_simplify(zipcodes[, 2], keep_shapes = TRUE), data)
+all_values <- unlist(data)
 pal <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
 leaflet(
-  zipcodes[, 2],
+  mapdata,
   options = leafletOptions(attributionControl = FALSE)
 ) |>
   addProviderTiles("CartoDB.Positron") |>
@@ -494,39 +565,118 @@ leaflet(
   addControl("Race: White", "topright") |>
   addLayersControl(
     position = "topleft",
-    baseGroups = c("Direct", "DownUp", "Pums", "Rake")
+    baseGroups = c(
+      "Direct", "Direct Weighted", "DownUp", "DownUp Households", "Pums", "Rake"
+    )
   ) |>
   addLegend("bottomright", pal, all_values, opacity = 1) |>
   addPolygons(
-    fillColor = pal(estimates_direct$race_white), fillOpacity = 1, weight = 1,
+    fillColor = ~ pal(Direct), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Direct", label = ~ paste(
-      ZIPCODE, "White:", round(estimates_direct$race_white, 3)
-    )
+    group = "Direct", label = ~ paste(ZIPCODE, "White:", Direct)
   ) |>
   addPolygons(
-    fillColor = pal(estimates_downup$race_white), fillOpacity = 1, weight = 1,
+    fillColor = ~ pal(DirectHH), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "DownUp", label = ~ paste(
-      ZIPCODE, "White:", round(estimates_downup$race_white, 3)
-    )
+    group = "Direct Weighted", label = ~ paste(ZIPCODE, "White:", DirectHH)
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(DownUp), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "DownUp", label = ~ paste(ZIPCODE, "White:", DownUp)
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(DownUpHH), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "DownUp Households", label = ~ paste(ZIPCODE, "White:", DownUpHH)
   ) |>
   hideGroup("DownUp") |>
   addPolygons(
-    fillColor = pal(estimates_pums$zipcode$race_white), fillOpacity = 1, weight = 1,
+    fillColor = ~ pal(Pums), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Pums", label = ~ paste(
-      ZIPCODE, "White:", round(estimates_pums$zipcode$race_white, 3)
-    )
+    group = "Pums", label = ~ paste(ZIPCODE, "White:", Pums)
   ) |>
   hideGroup("Pums") |>
   addPolygons(
-    fillColor = pal(estimates_rake$zipcode$race_white), fillOpacity = 1, weight = 1,
+    fillColor = ~ pal(Rake), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "Rake", label = ~ paste(
-      ZIPCODE, "White:", round(estimates_rake$zipcode$race_white, 3)
-    )
+    group = "Rake", label = ~ paste(ZIPCODE, "White:", Rake)
   ) |>
   hideGroup("Rake")
 ```
 
+And look at the correlations between them:
+```{r}
+kable(cor(data), digits = 5)
+```
+
+Finally, we might take a look at the smallest category variable (race: native):
+```{r}
+data_native <- cbind(
+  Direct = estimates_direct$race_native,
+  DirectHH = estimates_direct_weighted$race_native,
+  DownUp = estimates_downup$race_native,
+  DownUpHH = estimates_downup_hh$race_native,
+  Pums = estimates_pums$race_native,
+  Rake = estimates_rake$race_native
+)
+data.frame(
+  "Race: Native" = c(Original = sum(block_groups$race_native), colSums(data_native)),
+  check.names = FALSE
+)
+kable(cor(data_native), digits = 5)
+```
+
+```{r, fig.height=4.5, fig.width=8.1, echo=FALSE}
+library(leaflet)
+mapdata <- cbind(rmapshaper::ms_simplify(zipcodes[, 2], keep_shapes = TRUE), data_native)
+all_values <- unlist(data_native)
+pal <- colorNumeric(scico::scico(255, palette = "lajolla"), all_values)
+leaflet(
+  mapdata,
+  options = leafletOptions(attributionControl = FALSE)
+) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addScaleBar("bottomleft") |>
+  addControl("Race: Native", "topright") |>
+  addLayersControl(
+    position = "topleft",
+    baseGroups = c(
+      "Direct", "Direct Weighted", "DownUp", "DownUp Households", "Pums", "Rake"
+    )
+  ) |>
+  addLegend("bottomright", pal, all_values, opacity = 1) |>
+  addPolygons(
+    fillColor = ~ pal(Direct), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Direct", label = ~ paste(ZIPCODE, "Native:", Direct)
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(DirectHH), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Direct Weighted", label = ~ paste(ZIPCODE, "Native:", DirectHH)
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(DownUp), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "DownUp", label = ~ paste(ZIPCODE, "Native:", DownUp)
+  ) |>
+  addPolygons(
+    fillColor = ~ pal(DownUpHH), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "DownUp Households", label = ~ paste(ZIPCODE, "Native:", DownUpHH)
+  ) |>
+  hideGroup("DownUp") |>
+  addPolygons(
+    fillColor = ~ pal(Pums), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Pums", label = ~ paste(ZIPCODE, "Native:", Pums)
+  ) |>
+  hideGroup("Pums") |>
+  addPolygons(
+    fillColor = ~ pal(Rake), fillOpacity = 1, weight = 1,
+    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
+    group = "Rake", label = ~ paste(ZIPCODE, "Native:", Rake)
+  ) |>
+  hideGroup("Rake")
+```
