@@ -20,6 +20,8 @@ navbar:
         href: articles/introduction.html
       - text: Method Comparisons
         href: articles/estimate_comparisons.html
+      - text: Household Estimates
+        href: articles/household_estimates.html
 
 reference:
 - title: Core Functions

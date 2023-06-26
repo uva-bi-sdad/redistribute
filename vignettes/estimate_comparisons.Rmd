@@ -1314,6 +1314,7 @@ draw_sample <- function(run = NULL, return_full = FALSE) {
     pums$crosswalk$PUMA5CE,
     names = pums$crosswalk$GEOID
   )[substring(ps$geoid, 1, 11)]
+  ps <- ps[!is.na(ps$PUMA), ]
   ps$single_family_home <- ps$Unit_Type != "MULTI"
   ps$type <- do.call(
     paste0, ps[, c("PUMA", "single_family_home"), drop = TRUE]
@@ -1387,3 +1388,4 @@ and (b) error is measured at the parcel level, rather than the block group level
 estimates_sim <- draw_sample(return_full = TRUE)
 kable(estimates_sim$error, digits = 5)
 ```
+
