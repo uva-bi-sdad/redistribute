@@ -77,11 +77,11 @@ variables <- c(
   income_150_200 = "B19001_016",
   income_gt200 = "B19001_017"
 )
-block_groups <- tidycensus::get_acs(
+block_groups <- st_transform(tidycensus::get_acs(
   "block group", variables,
   year = 2021, output = "wide", cache_table = TRUE,
   state = "51", county = counties, geometry = TRUE
-)[, -2]
+)[, -2], "WGS84")
 colnames(block_groups)[2] <- "Total"
 block_groups$race_other <- block_groups$Total - rowSums(
   block_groups[, grep("^race_.*E$", colnames(block_groups)), drop = TRUE]
@@ -116,7 +116,10 @@ if (!file.exists(zipcode_file)) {
     "https://www.fairfaxcounty.gov/euclid/rest/services/IPLS/IPLSMap",
     "/MapServer/3/query?where=1=1&outFields=*&outSR=4326&f=geojson"
   ))
-  saveRDS(zipcodes, zipcode_file, compress = "xz")
+  saveRDS(
+    st_transform(zipcodes, "WGS84"), zipcode_file,
+    compress = "xz"
+  )
 }
 zipcodes <- readRDS(zipcode_file)
 ```
@@ -168,7 +171,10 @@ if (!file.exists(parcel_file)) {
     "4f00b13df5a24cc19068bf356d3d1c45_1/downloads/data",
     "?format=geojson&spatialRefId=4326"
   ))
-  saveRDS(parcels, parcel_file, compress = "xz")
+  saveRDS(
+    st_transform(parcels, "WGS84"), parcel_file,
+    compress = "xz"
+  )
 }
 parcels <- readRDS(parcel_file)
 
@@ -183,10 +189,24 @@ parcels <- parcels[parcels$YEAR_BUILT <= 2021 & !duplicated(parcels$PIN), ]
 
 Then, we can disaggregate down from block groups:
 ```{r}
+# since not all block groups contain parcels, we'll need to fill some in
 map_bg_to_parcel <- redistribute(
   block_groups, parcels,
-  target_id = "PIN", return_map = TRUE
+  target_id = "PIN", return_map = TRUE, fill_targets = TRUE
 )
+rownames(parcels) <- parcels$PIN
+mapped_pins <- names(unlist(unname(map_bg_to_parcel)))
+parcels <- parcels[mapped_pins, ]
+filled <- which(is.na(parcels$PIN))
+filled_ids <- grep("^filled_", mapped_pins, value = TRUE)
+parcels$Total[filled] <- 1
+parcels$PIN[filled] <- filled_ids
+parcels$Unit_Type[filled] <- "SFD"
+parcels$geometry[filled] <- structure(
+  st_geometry(block_groups),
+  names = block_groups$GEOID
+)[sub("^filled_", "", filled_ids)]
+
 parcels$geoid <- structure(
   rep(names(map_bg_to_parcel), vapply(map_bg_to_parcel, length, 0)),
   names = names(unlist(unname(map_bg_to_parcel)))
@@ -196,17 +216,6 @@ estimates_parcels <- redistribute(
   block_groups, parcels, map_bg_to_parcel,
   target_id = "PIN", weight = "Total", default_value = 0
 )
-```
-
-Note that some block groups contain no parcels despite having
-non-zero populations, so our parcel-based estimates will be off total
-(there are `r sum(block_groups$Total) - sum(estimates_parcels$Total)` people unaccounted for by parcels):
-```{r}
-block_groups[
-  block_groups$GEOID %in% names(which(vapply(map_bg_to_parcel, length, 0) == 0)),
-  c("GEOID", "Total"),
-  drop = TRUE
-]
 ```
 
 Since [household estimates](https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::current-households/about)
@@ -220,7 +229,10 @@ if (!file.exists(parcel_hh_file)) {
     "6b11da4a036049b89e656db6fe834621_0/downloads/data",
     "?format=geojson&spatialRefId=4326"
   ))
-  saveRDS(parcels_hh, parcel_hh_file, compress = "xz")
+  saveRDS(
+    st_transform(parcels_hh, "WGS84"), parcel_hh_file,
+    compress = "xz"
+  )
 }
 parcels_hh <- readRDS(parcel_hh_file)
 rownames(parcels_hh) <- parcels_hh$PIN
@@ -230,8 +242,8 @@ mean(abs(estimates_parcels$Total - parcels_hh$CURRE_HHLDS), na.rm = TRUE)
 cor(estimates_parcels$Total, parcels_hh$CURRE_HHLDS, use = "complete.obs")
 ```
 
-Despite the under-coverage of block groups by parcels, the estimated number of households
-at the parcel level is slightly higher (which could also be influenced by the difference in time):
+The estimated number of households at the parcel level is slightly higher,
+potentially in part due to the difference in time:
 ```{r}
 totals <- c(
   "Block Groups" = sum(block_groups$Total),
@@ -255,30 +267,8 @@ mean(abs(estimates_downup$Total - zipcodes$HOUSEHOLDS))
 cor(estimates_downup$Total, zipcodes$HOUSEHOLDS)
 ```
 
-As in the direct case, we can also see how much of an improvement weighting by
-household estimates might make:
-```{r}
-# recalculate the parcel estimates
-estimates_parcels_hh <- redistribute(
-  block_groups, parcels_hh, map_bg_to_parcel,
-  target_id = "PIN", weight = "CURRE_HHLDS"
-)
-
-mean(abs(estimates_parcels_hh$Total - parcels_hh$CURRE_HHLDS), na.rm = TRUE)
-cor(estimates_parcels_hh$Total, parcels_hh$CURRE_HHLDS, use = "complete.obs")
-
-# reaggregate to zipcodes
-estimates_downup_hh <- redistribute(
-  estimates_parcels_hh, zipcodes, map_parcel_to_zip,
-  source_id = "id", target_id = "ZIPCODE", default_value = 0
-)
-
-mean(abs(estimates_downup_hh$Total - zipcodes$HOUSEHOLDS))
-cor(estimates_downup_hh$Total, zipcodes$HOUSEHOLDS)
-```
-
-The parcel-level household estimates differ very little from the unit counts,
-so it makes less of a difference in this case:
+Since the parcel-level household estimates differ very little from the unit counts,
+it makes less of a difference in this case:
 ```{r}
 mean(abs(parcels$Total - parcels_hh$CURRE_HHLDS), na.rm = TRUE)
 cor(parcels$Total, parcels_hh$CURRE_HHLDS, use = "complete.obs")
@@ -536,7 +526,6 @@ data <- cbind(
   Direct = estimates_direct$race_white,
   DirectHH = estimates_direct_weighted$race_white,
   DownUp = estimates_downup$race_white,
-  DownUpHH = estimates_downup_hh$race_white,
   Pums = estimates_pums$race_white,
   Rake = estimates_rake$race_white
 )
@@ -566,7 +555,7 @@ leaflet(
   addLayersControl(
     position = "topleft",
     baseGroups = c(
-      "Direct", "Direct Weighted", "DownUp", "DownUp Households", "Pums", "Rake"
+      "Direct", "Direct Weighted", "DownUp", "Pums", "Rake"
     )
   ) |>
   addLegend("bottomright", pal, all_values, opacity = 1) |>
@@ -584,11 +573,6 @@ leaflet(
     fillColor = ~ pal(DownUp), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
     group = "DownUp", label = ~ paste(ZIPCODE, "White:", DownUp)
-  ) |>
-  addPolygons(
-    fillColor = ~ pal(DownUpHH), fillOpacity = 1, weight = 1,
-    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "DownUp Households", label = ~ paste(ZIPCODE, "White:", DownUpHH)
   ) |>
   hideGroup("DownUp") |>
   addPolygons(
@@ -616,7 +600,6 @@ data_native <- cbind(
   Direct = estimates_direct$race_native,
   DirectHH = estimates_direct_weighted$race_native,
   DownUp = estimates_downup$race_native,
-  DownUpHH = estimates_downup_hh$race_native,
   Pums = estimates_pums$race_native,
   Rake = estimates_rake$race_native
 )
@@ -642,7 +625,7 @@ leaflet(
   addLayersControl(
     position = "topleft",
     baseGroups = c(
-      "Direct", "Direct Weighted", "DownUp", "DownUp Households", "Pums", "Rake"
+      "Direct", "Direct Weighted", "DownUp", "Pums", "Rake"
     )
   ) |>
   addLegend("bottomright", pal, all_values, opacity = 1) |>
@@ -660,11 +643,6 @@ leaflet(
     fillColor = ~ pal(DownUp), fillOpacity = 1, weight = 1,
     color = "#000", highlightOptions = highlightOptions(color = "#fff"),
     group = "DownUp", label = ~ paste(ZIPCODE, "Native:", DownUp)
-  ) |>
-  addPolygons(
-    fillColor = ~ pal(DownUpHH), fillOpacity = 1, weight = 1,
-    color = "#000", highlightOptions = highlightOptions(color = "#fff"),
-    group = "DownUp Households", label = ~ paste(ZIPCODE, "Native:", DownUpHH)
   ) |>
   hideGroup("DownUp") |>
   addPolygons(

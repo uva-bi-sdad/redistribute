@@ -333,8 +333,8 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     if (aggregate) source_geom else st_geometry(target)
   ), fixed = TRUE))
   if (polys && any(mls > 1)) {
-    map <- lapply(sid, function(id) {
-      e <- map[[id]]
+    map <- lapply(seq_along(map), function(i) {
+      e <- map[[i]]
       if (length(e)) {
         res <- if (is.null(names(e))) {
           w <- rep(1, length(e))
@@ -343,11 +343,11 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
             totals <- s2_area(reg)
             su <- totals > 0
             if (any(su)) {
-              part <- suppressMessages(st_intersection(reg[su], source_geom[id], model = "closed"))
+              part <- suppressMessages(st_intersection(reg[su], source_geom[sid[i]], model = "closed"))
               pv <- numeric(length(part))
               tsu <- s2_is_valid(part)
               pv[tsu] <- s2_area(part[tsu])
-              w[su] <- pv / (if (aggregate) s2_area(source_geom[[id]]) else totals[su])
+              w[su] <- pv / (if (aggregate) s2_area(source_geom[[sid[i]]]) else totals[su])
             }
           }
           names(w) <- if (is.integer(e)) tid[e] else e
