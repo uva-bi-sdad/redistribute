@@ -8,8 +8,9 @@ redistribute(source, target = NULL, map = list(), source_id = "GEOID",
   target_id = source_id, weight = NULL, source_variable = NULL,
   source_value = NULL, aggregate = NULL, weight_agg_method = "auto",
   default_value = NA, outFile = NULL, overwrite = FALSE,
-  make_intersect_map = FALSE, overlaps = "keep", use_all = TRUE,
-  return_geometry = TRUE, return_map = FALSE, verbose = FALSE)
+  make_intersect_map = FALSE, fill_targets = FALSE, overlaps = "keep",
+  use_all = TRUE, return_geometry = TRUE, return_map = FALSE,
+  verbose = FALSE)
 }
 \arguments{
 \item{source}{A matrix-like object you want to distribute from; usually this will be
@@ -60,6 +61,9 @@ is integer-like, and average otherwise).}
 \item{make_intersect_map}{Logical; if \code{TRUE}, will opt to calculate an intersect-based map
 rather than an ID-based map, if both seem possible. If specified as \code{FALSE}, will
 never calculate an intersect-based map.}
+
+\item{fill_targets}{Logical; if \code{TRUE}, will make new \code{target} rows for any
+un-mapped \code{source} row.}
 
 \item{overlaps}{If specified and not \code{TRUE} or \code{"keep"}, will assign \code{target}
 entities that are mapped to multiple \code{source} entities to a single source entity. The value

@@ -150,3 +150,12 @@ test_that("intersect map work", {
   expect_equal(redistribute(mres[, 1:4], source, map = map, source_id = "id", target_id = "id"), mares)
   expect_equal(redistribute(mres[, 1:4], source, source_id = "id", target_id = "id", make_intersect_map = TRUE), mares)
 })
+
+test_that("fill_targets works", {
+  source <- data.frame(GEOID = c("a", "b"), v1 = c(1, 2))
+  target <- data.frame(GEOID = c("a1", "a2"))
+  expect_identical(
+    redistribute(source, target, weight = c(.6, .4), fill_targets = TRUE),
+    data.frame(id = c("a1", "a2", "filled_b"), v1 = c(.6, .4, 2))
+  )
+})

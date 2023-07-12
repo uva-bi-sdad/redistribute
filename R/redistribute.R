@@ -39,6 +39,8 @@
 #' @param make_intersect_map Logical; if \code{TRUE}, will opt to calculate an intersect-based map
 #' rather than an ID-based map, if both seem possible. If specified as \code{FALSE}, will
 #' never calculate an intersect-based map.
+#' @param fill_targets Logical; if \code{TRUE}, will make new \code{target} rows for any
+#' un-mapped \code{source} row.
 #' @param overlaps If specified and not \code{TRUE} or \code{"keep"}, will assign \code{target}
 #' entities that are mapped to multiple \code{source} entities to a single source entity. The value
 #' determines how entities with the same weight should be assigned, between \code{"first"} (default),
@@ -85,8 +87,8 @@
 redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID",
                          target_id = source_id, weight = NULL, source_variable = NULL, source_value = NULL,
                          aggregate = NULL, weight_agg_method = "auto", default_value = NA, outFile = NULL,
-                         overwrite = FALSE, make_intersect_map = FALSE, overlaps = "keep", use_all = TRUE,
-                         return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
+                         overwrite = FALSE, make_intersect_map = FALSE, fill_targets = FALSE, overlaps = "keep",
+                         use_all = TRUE, return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
@@ -402,6 +404,18 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   } else {
     names(map) <- sid
   }
+  n_filled <- 0
+  if (fill_targets) {
+    su <- vapply(map, length, 0) == 0
+    if (any(su)) {
+      missed_sources <- names(which(su))
+      ftids <- paste0("filled_", missed_sources)
+      n_filled <- length(ftids)
+      if (verbose) cli_alert_info("adding {n_filled} target ID{?s} to cover all source rows")
+      tid <- c(tid, ftids)
+      map[missed_sources] <- split(structure(rep(1, n_filled), names = ftids), missed_sources)
+    }
+  }
   if (verbose && intersect_map) cli_progress_done()
   if (return_map) {
     if (verbose) cli_alert_info("returning map")
@@ -411,7 +425,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   nout <- length(if (aggregate) sid else tid)
   w <- if (length(weight) > 1) {
     if (verbose) cli_alert_info("weights: {.arg weight} vector")
-    if (length(weight) != nout) {
+    if (length(weight) != nout && (!n_filled || length(weight) + n_filled != nout)) {
       cli_abort("{.arg weight} is not the same length as {.arg {if (aggregate) 'source' else 'target'}} IDs")
     }
     weight
@@ -429,6 +443,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     rep(weight, nout)
   }
   w <- as.numeric(w)
+  if (n_filled) w <- c(w, rep(1, n_filled))
   realign <- FALSE
   su <- tid %in% mtid
   if (!all(su)) {
