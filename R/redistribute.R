@@ -73,7 +73,7 @@
 #' @importFrom RcppParallel RcppParallelLibs
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
-#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform st_buffer
+#' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform st_buffer st_as_sf
 #' @importFrom s2 s2_area s2_is_valid
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
@@ -96,6 +96,24 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   source_sf <- can_intersects && inherits(source, c("sfc", "sf"))
   target_sf <- can_intersects && inherits(target, c("sfc", "sf"))
   can_intersects <- source_sf && target_sf
+  if (!can_intersects && make_intersect_map) {
+    if (!source_sf && is.data.frame(source) && any(vapply(source, inherits, TRUE, "sfc"))) {
+      cli_warn("{.arg source} is not an sf object, but contains a simple features column, so converting it")
+      source <- st_as_sf(source)
+      source_sf <- TRUE
+    }
+    if (!target_sf && is.data.frame(target) && any(vapply(target, inherits, TRUE, "sfc"))) {
+      cli_warn("{.arg target} is not an sf object, but contains a simple features column, so converting it")
+      target <- st_as_sf(target)
+      target_sf <- TRUE
+    }
+    can_intersects <- source_sf && target_sf
+    if (!can_intersects) {
+      cli_abort(
+        "{.arg make_intersect_map} was set to {.field TRUE}, but {.arg source} and {.arg target} are not both sf objects"
+      )
+    }
+  }
   intersect_map <- FALSE
   if (length(dim(source)) != 2) source <- data.frame(source)
   if (is.null(colnames(source))) colnames(source) <- paste0("V", seq_len(ncol(source)))

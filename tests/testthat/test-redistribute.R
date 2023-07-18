@@ -72,10 +72,10 @@ test_that("intersect map work", {
   ))
 
   ## disaggregation
-  map <- redistribute(
-    source, target,
+  expect_warning(map <- redistribute(
+    as.data.frame(source), target,
     source_id = "id", target_id = "id", return_map = TRUE, make_intersect_map = TRUE
-  )
+  ), "is not an sf object")
   mres <- target
   for (v in vars) mres[, v] <- 0
   mres <- mres[, c("id", vars, "population")]
