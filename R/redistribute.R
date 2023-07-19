@@ -463,6 +463,10 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   }
   w <- as.numeric(w)
   if (n_filled) w <- c(w, rep(1, n_filled))
+  if (anyNA(w)) {
+    cli_warn("weights contained NAs, which were set to 0")
+    w[is.na(w)] <- 0
+  }
   realign <- FALSE
   su <- tid %in% mtid
   if (!all(su)) {

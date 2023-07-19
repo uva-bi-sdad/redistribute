@@ -594,7 +594,7 @@ we have to rescale them to be comparable. For illustration:
 ```{r}
 # adjust tract counts so they match
 # unit totals * average household size across parcels
-tr_adj <- st_drop_geometry(tracts)
+tr_adj <- st_drop_geometry(tracts[tracts$id %in% pums$crosswalk$GEOID, ])
 pid <- substring(parcels$geoid, 1, 11)
 parcels$renter_est <- parcels$Renter_Occupied * structure(
   tracts$avg_hhsize_rent,
@@ -836,11 +836,12 @@ est_nstep <- function(source, target, individuals) {
       }
     ))
     hh <- individuals[!duplicated(individuals$SERIALNO), ]
+    hh$weight[hh$weight == 0] <- 1
     weight <- hh$PWGTP / hh$weight * hh$WGTP
     list(
       error = mean(vapply(names(household_totals), function(v) {
         mean((household_totals[[v]] - tapply(weight, hh[[v]], sum) / sum(weight))^2)
-      }, 0)),
+      }, 0), na.rm = TRUE),
       data = individuals
     )
   }
