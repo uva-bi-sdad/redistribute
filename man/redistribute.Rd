@@ -65,9 +65,9 @@ never calculate an intersect-based map.}
 \item{fill_targets}{Logical; if \code{TRUE}, will make new \code{target} rows for any
 un-mapped \code{source} row.}
 
-\item{overlaps}{If specified and not \code{TRUE} or \code{"keep"}, will assign \code{target}
+\item{overlaps}{If specified and not \code{TRUE} or \code{"keep"} (default), will assign \code{target}
 entities that are mapped to multiple \code{source} entities to a single source entity. The value
-determines how entities with the same weight should be assigned, between \code{"first"} (default),
+determines how entities with the same weight should be assigned, between \code{"first"},
 \code{"last"}, and \code{"random"}.}
 
 \item{use_all}{Logical; if \code{TRUE} (default), will redistribute map weights so they sum to 1.

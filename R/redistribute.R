@@ -41,9 +41,9 @@
 #' never calculate an intersect-based map.
 #' @param fill_targets Logical; if \code{TRUE}, will make new \code{target} rows for any
 #' un-mapped \code{source} row.
-#' @param overlaps If specified and not \code{TRUE} or \code{"keep"}, will assign \code{target}
+#' @param overlaps If specified and not \code{TRUE} or \code{"keep"} (default), will assign \code{target}
 #' entities that are mapped to multiple \code{source} entities to a single source entity. The value
-#' determines how entities with the same weight should be assigned, between \code{"first"} (default),
+#' determines how entities with the same weight should be assigned, between \code{"first"},
 #' \code{"last"}, and \code{"random"}.
 #' @param use_all Logical; if \code{TRUE} (default), will redistribute map weights so they sum to 1.
 #' Otherwise, entities may be partially weighted.
@@ -74,6 +74,7 @@
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
 #' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform st_buffer st_as_sf
+#' st_is_valid
 #' @importFrom s2 s2_area s2_is_valid
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
@@ -359,7 +360,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
           if (intersect_map && length(e) > 1) {
             reg <- st_geometry(target)[e]
             totals <- s2_area(reg)
-            su <- totals > 0
+            su <- totals > 0 & st_is_valid(reg)
             if (any(su)) {
               part <- suppressMessages(st_intersection(reg[su], source_geom[sid[i]], model = "closed"))
               pv <- numeric(length(part))
