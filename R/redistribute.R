@@ -74,7 +74,7 @@
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
 #' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform st_buffer st_as_sf
-#' st_is_valid
+#' st_is_valid st_make_valid
 #' @importFrom s2 s2_area s2_is_valid
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
@@ -298,12 +298,36 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     } else if (can_intersects) {
       if (verbose) {
         cli_alert_info("map: intersections between geometries")
-        cli_progress_step("mapping...", msg_done = "done mapping")
+        cli_progress_step("initial mapping...", msg_done = "done initial mapping")
       }
       intersect_map <- TRUE
       op <- options(sf_use_s2 = FALSE)
       on.exit(options(sf_use_s2 = op[[1]]))
       if (st_crs(source) != st_crs(target)) target <- st_transform(target, st_crs(source))
+      su <- !st_is_valid(st_geometry(source))
+      if (any(su)) {
+        st_geometry(source)[su] <- st_make_valid(st_geometry(source)[su])
+        su <- !st_is_valid(st_geometry(source))
+        if (any(su)) {
+          cli_warn("some {.arg source} geometries were not valid, so removed unrepairable ones")
+          source <- source[!su, ]
+          sid <- sid[!su]
+        } else {
+          cli_warn("some {.arg source} geometries were not valid, so repaired them")
+        }
+      }
+      su <- !st_is_valid(st_geometry(target))
+      if (any(su)) {
+        st_geometry(target)[su] <- st_make_valid(st_geometry(target)[su])
+        su <- !st_is_valid(st_geometry(target))
+        if (any(su)) {
+          cli_warn("some {.arg target} geometries were not valid, so removed unrepairable ones")
+          target <- target[!su, ]
+          tid <- tid[!su]
+        } else {
+          cli_warn("some {.arg target} geometries were not valid, so repaired them")
+        }
+      }
       map <- tryCatch(suppressMessages(st_intersects(st_geometry(source), st_geometry(target))), error = function(e) NULL)
       if (is.null(map)) {
         cli_abort(c(
@@ -352,7 +376,18 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     if (aggregate) source_geom else st_geometry(target)
   ), fixed = TRUE))
   if (polys && any(mls > 1)) {
+    if (verbose) {
+      oi <- 0
+      cli_progress_step(
+        "calculating map intersections ({oi}/{length(map)})",
+        msg_done = "calculated map intersections ({length(map)})"
+      )
+    }
     map <- lapply(seq_along(map), function(i) {
+      if (verbose) {
+        oi <<- i
+        cli_progress_update(.envir = parent.frame(2))
+      }
       e <- map[[i]]
       if (length(e)) {
         res <- if (is.null(names(e))) {
@@ -360,7 +395,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
           if (intersect_map && length(e) > 1) {
             reg <- st_geometry(target)[e]
             totals <- s2_area(reg)
-            su <- totals > 0 & st_is_valid(reg)
+            su <- totals > 0
             if (any(su)) {
               part <- suppressMessages(st_intersection(reg[su], source_geom[sid[i]], model = "closed"))
               pv <- numeric(length(part))
@@ -388,6 +423,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
         numeric()
       }
     })
+    if (verbose) cli_progress_done()
   } else {
     map <- lapply(map, function(e) {
       if (is.null(names(e))) {
