@@ -7,10 +7,10 @@
 redistribute(source, target = NULL, map = list(), source_id = "GEOID",
   target_id = source_id, weight = NULL, source_variable = NULL,
   source_value = NULL, aggregate = NULL, weight_agg_method = "auto",
-  default_value = NA, outFile = NULL, overwrite = FALSE,
-  make_intersect_map = FALSE, fill_targets = FALSE, overlaps = "keep",
-  use_all = TRUE, return_geometry = TRUE, return_map = FALSE,
-  verbose = FALSE)
+  rescale = TRUE, drop_extra_sources = FALSE, default_value = NA,
+  outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
+  fill_targets = FALSE, overlaps = "keep", use_all = TRUE,
+  return_geometry = TRUE, return_map = FALSE, verbose = FALSE)
 }
 \arguments{
 \item{source}{A matrix-like object you want to distribute from; usually this will be
@@ -51,6 +51,13 @@ from \code{source} to \code{target}. Otherwise, this will be \code{TRUE} if ther
 \item{weight_agg_method}{Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
 Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
 is integer-like, and average otherwise).}
+
+\item{rescale}{Logical; if \code{FALSE}, will not adjust target values after redistribution such that they
+match source totals.}
+
+\item{drop_extra_sources}{Logical; if \code{TRUE}, will remove any source rows that are not mapped
+to any target rows. Useful when inputting a source with regions outside of the target area,
+especially when \code{rescale} is \code{TRUE}.}
 
 \item{default_value}{Value to set to any unmapped target ID.}
 

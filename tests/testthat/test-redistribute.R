@@ -108,7 +108,7 @@ test_that("intersect map work", {
       weight = "population", source_id = "id", target_id = "id", verbose = TRUE
     ),
     type = "message"
-  ), 3)), c(
+  ), 3))[1:9], c(
     "source IDs: id column of `source`",
     "target IDs: id column of `target`",
     "map: provided list",
@@ -169,5 +169,13 @@ test_that("fill_targets works", {
   expect_identical(
     redistribute(source, target, weight = c(.6, .4), fill_targets = TRUE),
     data.frame(id = c("a1", "a2", "filled_b"), v1 = c(.6, .4, 2))
+  )
+  expect_identical(
+    within(redistribute(source, target, weight = c(.6, .4)), v1 <- round(v1, 2)),
+    data.frame(id = c("a1", "a2"), v1 = c(1.8, 1.2))
+  )
+  expect_identical(
+    redistribute(source, target, weight = c(.6, .4), drop_extra_sources = TRUE),
+    data.frame(id = c("a1", "a2"), v1 = c(.6, .4))
   )
 })

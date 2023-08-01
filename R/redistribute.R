@@ -359,19 +359,6 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     map <- as.list(unlist(map))
     names(map) <- rep(ids, child_counts)
   }
-  if (!fill_targets && drop_extra_sources) {
-    su <- vapply(map, length, 0) != 0
-    if (!all(su)) {
-      if (verbose) cli_alert_info("removing {sum(!su)} {.arg source}{?s} with no mapped {.arg target}s")
-      source <- source[su,]
-      sid <- sid[su]
-      map <- map[su]
-    }
-  }
-  if (intersect_map) {
-    source_geom <- st_geometry(source)
-    names(source_geom) <- sid
-  }
   if ((is.logical(overlaps) && overlaps) || grepl("^[Kk]", overlaps)) {
     dodedupe <- FALSE
   } else {
@@ -398,6 +385,19 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   any_partial <- FALSE
   map <- map[sid]
   mls <- vapply(map, length, 0)
+  if (!fill_targets && drop_extra_sources) {
+    su <- vapply(map, length, 0) != 0
+    if (!all(su)) {
+      if (verbose) cli_alert_info("removing {sum(!su)} {.arg source}{?s} with no mapped {.arg target}s")
+      source <- source[su, , drop = FALSE]
+      sid <- sid[su]
+      map <- map[su]
+    }
+  }
+  if (intersect_map) {
+    source_geom <- st_geometry(source)
+    names(source_geom) <- sid
+  }
   polys <- intersect_map && any(grepl("POLY", st_geometry_type(
     if (aggregate) source_geom else st_geometry(target)
   ), fixed = TRUE))
