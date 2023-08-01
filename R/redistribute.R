@@ -33,6 +33,11 @@
 #' @param weight_agg_method Means of aggregating \code{weight}, in the case that target IDs contain duplicates.
 #' Options are \code{"sum"}, \code{"average"}, or \code{"auto"} (default; which will sum if \code{weight}
 #' is integer-like, and average otherwise).
+#' @param rescale Logical; if \code{FALSE}, will not adjust target values after redistribution such that they
+#' match source totals.
+#' @param drop_extra_sources Logical; if \code{TRUE}, will remove any source rows that are not mapped
+#' to any target rows. Useful when inputting a source with regions outside of the target area,
+#' especially when \code{rescale} is \code{TRUE}.
 #' @param default_value Value to set to any unmapped target ID.
 #' @param outFile Path to a CSV file in which to save results.
 #' @param overwrite Logical; if \code{TRUE}, will overwrite an existing \code{outFile}.
@@ -74,7 +79,7 @@
 #' @importFrom utils unzip
 #' @importFrom sf st_intersects st_intersection st_geometry st_geometry<- st_crs st_geometry_type
 #' st_coordinates st_centroid st_boundary st_cast st_polygon st_union st_transform st_buffer st_as_sf
-#' st_is_valid st_make_valid
+#' st_is_valid st_make_valid st_sfc st_point
 #' @importFrom s2 s2_area s2_is_valid
 #' @importFrom lingmatch lma_simets
 #' @importFrom jsonlite read_json write_json
@@ -85,11 +90,12 @@
 #' @useDynLib redistribute, .registration = TRUE
 #' @export
 
-redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID",
-                         target_id = source_id, weight = NULL, source_variable = NULL, source_value = NULL,
-                         aggregate = NULL, weight_agg_method = "auto", default_value = NA, outFile = NULL,
-                         overwrite = FALSE, make_intersect_map = FALSE, fill_targets = FALSE, overlaps = "keep",
-                         use_all = TRUE, return_geometry = TRUE, return_map = FALSE, verbose = FALSE) {
+redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID", target_id = source_id,
+                         weight = NULL, source_variable = NULL, source_value = NULL, aggregate = NULL,
+                         weight_agg_method = "auto", rescale = TRUE, drop_extra_sources = FALSE,
+                         default_value = NA, outFile = NULL, overwrite = FALSE, make_intersect_map = FALSE,
+                         fill_targets = FALSE, overlaps = "keep", use_all = TRUE, return_geometry = TRUE,
+                         return_map = FALSE, verbose = FALSE) {
   if (!overwrite && !is.null(outFile) && file.exists(outFile)) {
     cli_abort("{.arg outFile} already exists; use {.code overwrite = TRUE} to overwrite it")
   }
@@ -303,7 +309,13 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       intersect_map <- TRUE
       op <- options(sf_use_s2 = FALSE)
       on.exit(options(sf_use_s2 = op[[1]]))
-      if (st_crs(source) != st_crs(target)) target <- st_transform(target, st_crs(source))
+      if (st_crs(source) != st_crs(target)) {
+        if (length(tid) > length(sid)) {
+          source <- st_transform(source, st_crs(target))
+        } else {
+          target <- st_transform(target, st_crs(source))
+        }
+      }
       su <- !st_is_valid(st_geometry(source))
       if (any(su)) {
         st_geometry(source)[su] <- st_make_valid(st_geometry(source)[su])
@@ -347,8 +359,16 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     map <- as.list(unlist(map))
     names(map) <- rep(ids, child_counts)
   }
+  if (!fill_targets && drop_extra_sources) {
+    su <- vapply(map, length, 0) != 0
+    if (!all(su)) {
+      if (verbose) cli_alert_info("removing {sum(!su)} {.arg source}{?s} with no mapped {.arg target}s")
+      source <- source[su,]
+      sid <- sid[su]
+      map <- map[su]
+    }
+  }
   if (intersect_map) {
-    if (st_crs(source) != st_crs(target)) target <- st_transform(target, st_crs(source))
     source_geom <- st_geometry(source)
     names(source_geom) <- sid
   }
@@ -357,17 +377,23 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   } else {
     tiebreak <- c(f = "first", l = "last", r = "random")[tolower(substring(overlaps, 1, 1))]
     dodedupe <- !is.na(tiebreak)
-    deduper <- function(e, agg = TRUE, tm = tiebreak) {
-      su <- which(e == max(e))
-      if (length(su) > 1) {
-        su <- switch(tm,
-          first = su[1],
-          last = su[length(su)],
-          random = sample(su, 1)
-        )
+    deduper <- switch(tiebreak,
+      first = function(e, agg = TRUE) {
+        su <- which(e == max(e))
+        if (length(su) > 1) su <- su[1]
+        if (agg) e[su] else su
+      },
+      last = function(e, agg = TRUE) {
+        su <- which(e == max(e))
+        if (length(su) > 1) su <- su[length(su)]
+        if (agg) e[su] else su
+      },
+      random = function(e, agg = TRUE) {
+        su <- which(e == max(e))
+        if (length(su) > 1) su <- sample(su, 1)
+        if (agg) e[su] else su
       }
-      if (agg) e[su] else su
-    }
+    )
   }
   any_partial <- FALSE
   map <- map[sid]
@@ -438,7 +464,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
   targets <- unlist(unname(map))
   if (!any_partial) any_partial <- anyDuplicated(names(targets))
   if (dodedupe && any_partial) {
-    if (verbose) cli_alert_info("assigning each target to a single source")
+    if (verbose) cli_progress_step("assigning each target to a single source")
     any_partial <- FALSE
     esids <- factor(rep(sid, vapply(map, length, 0)), unique(sid))
     if (anyDuplicated(names(targets))) {
@@ -456,6 +482,7 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       targets[] <- 1L
       map <- split(targets, esids)
     }
+    if (verbose) cli_progress_done()
   } else {
     names(map) <- sid
   }
@@ -581,6 +608,38 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
       res[, l$index] <- l$levels[x]
     }
   }
+  if (rescale) {
+    if (verbose) {
+      status <- "checking totals"
+      cli_progress_step("{status}")
+    }
+    source_totals <- vapply(
+      seq_along(source_numeric),
+      function(i) if (source_numeric[i]) sum(source[, i], na.rm = TRUE) else 0,
+      0
+    )
+    res_totals <- vapply(
+      seq_along(source_numeric),
+      function(i) if (source_numeric[i]) sum(res[, i], na.rm = TRUE) else 0,
+      0
+    )
+    su <- which(source_totals != res_totals)
+    if (length(su)) {
+      if (verbose) {
+        status <- paste0("rescaling ", length(su), " variable", if (length(su) == 1) "" else "s")
+        cli_progress_update()
+      }
+      res_totals[res_totals == 0] <- 1
+      for (i in su) res[, i] <- res[, i] / res_totals[i] * source_totals[i]
+      if (verbose) {
+        status <- sub("rescaling", "rescaled", status, fixed = TRUE)
+        cli_progress_done()
+      }
+    } else if (verbose) {
+      status <- "totals are aligned"
+      cli_progress_done()
+    }
+  }
   res <- cbind(id = tid, res)
   if (realign) {
     if (verbose) cli_alert_info("realigning with original target IDs")
@@ -597,6 +656,16 @@ redistribute <- function(source, target = NULL, map = list(), source_id = "GEOID
     vroom_write(res, outFile, ",")
     if (verbose) cli_progress_done()
   }
-  if (return_geometry && target_sf) st_geometry(res) <- st_geometry(target)
+  if (return_geometry && target_sf) {
+    st_geometry(res) <- if (n_filled) {
+      c(st_geometry(target), if (source_sf) {
+        structure(source_geom, names = sid)[missed_sources]
+      } else {
+        st_sfc(lapply(seq_len(n_filled), function(i) st_point()), crs = st_crs(target))
+      })
+    } else {
+      st_geometry(target)
+    }
+  }
   invisible(res)
 }
